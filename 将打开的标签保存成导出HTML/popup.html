@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --primary-dark: #1976D2;
+            --surface-color: #FFFFFF;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #E0E0E0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            width: 320px;
+            padding: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--surface-color);
+            color: var(--text-primary);
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;  /* Reduced from 12px */
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stats {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;  /* Reduced from 8px */
+            padding: 8px 12px;
+            background: #F5F5F5;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-secondary);
+        }
+
+        .stat-value {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .group-details {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #E3F2FD;
+            border-radius: 6px;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .group-detail-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            color: var(--text-secondary);
+        }
+        
+        .group-color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .group-detail-name {
+            flex-grow: 1;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .group-detail-count {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: var(--primary-color);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .button:hover {
+            background: var(--primary-dark);
+        }
+
+        .button svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .footer {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 2px;  /* Reduced from 4px */
+        }
+
+        #status {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+            min-height: 16px;  /* Reduced from 20px */
+            margin: 0;  /* Added to ensure no extra space */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="icons/icon48.png" alt="T打开的标签保存成HTML" class="logo">
+            <h1 class="title">打开的标签保存成HTML</h1>
+        </header>
+
+        <div class="stats">
+            <div class="stat-row">
+                <span>打开的窗口总数</span>
+                <span class="stat-value" id="windowCount">0</span>
+            </div>
+            <div class="stat-row">
+                <span>打开的标签总数</span>
+                <span class="stat-value" id="tabCount">0</span>
+            </div>
+            <div class="stat-row">
+                <span>标签组数量</span>
+                <span class="stat-value" id="groupCount">0</span>
+            </div>
+        </div>
+        
+        <div id="groupDetails" class="group-details"></div>
+
+        <button id="saveButton" class="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            保存标签
+        </button>
+
+        <button id="updateGroupNamesButton" class="button" style="background: #4CAF50;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            更新组名
+        </button>
+
+        <div id="status"></div>
+
+        <div class="footer">
+            点击将所有标签页保存为有序的HTML文件
+        </div>
+    </div>
+    <script src="popup.js"></script>
+    <script src="popup-ui.js"></script>
+</body>
+</html>
