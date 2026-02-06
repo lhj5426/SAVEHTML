@@ -27,6 +27,10 @@
       "128": "icons/icon128.png"
     }
   },
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
   "author": "Eugenia Kovalenko",
   "homepage_url": "https://www.withserena.com"
 }
