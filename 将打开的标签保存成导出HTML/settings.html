@@ -272,7 +272,13 @@
     <div class="container">
         <div class="header">
             <h1>🎯 标签分组规则设置</h1>
-            <button class="button button-primary" onclick="window.close()">关闭</button>
+            <div style="display: flex; gap: 8px;">
+                <button class="button button-primary" id="exportButton">导出配置</button>
+                <button class="button button-success" id="importButton">导入配置</button>
+                <button class="button button-danger" id="clearButton">清空规则</button>
+                <input type="file" id="importFile" accept=".json" style="display: none;">
+                <button class="button button-primary" id="closeButton">关闭</button>
+            </div>
         </div>
 
         <div id="statusMessage" class="status-message"></div>

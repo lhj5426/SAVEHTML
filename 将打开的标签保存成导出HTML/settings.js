@@ -379,4 +379,161 @@ document.addEventListener('DOMContentLoaded', () => {
             addRule();
         });
     }
+    
+    // 导出配置按钮
+    const exportButton = document.getElementById('exportButton');
+    if (exportButton) {
+        exportButton.addEventListener('click', exportConfig);
+    }
+    
+    // 导入配置按钮
+    const importButton = document.getElementById('importButton');
+    if (importButton) {
+        importButton.addEventListener('click', () => {
+            document.getElementById('importFile').click();
+        });
+    }
+    
+    // 导入文件选择
+    const importFile = document.getElementById('importFile');
+    if (importFile) {
+        importFile.addEventListener('change', importConfig);
+    }
+    
+    // 关闭按钮
+    const closeButton = document.getElementById('closeButton');
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            window.close();
+        });
+    }
+    
+    // 清空规则按钮
+    const clearButton = document.getElementById('clearButton');
+    if (clearButton) {
+        clearButton.addEventListener('click', clearAllRules);
+    }
 });
+
+
+// 导出配置
+function exportConfig() {
+    console.log('Export config clicked');
+    chrome.storage.sync.get([STORAGE_KEY], (result) => {
+        const rules = result[STORAGE_KEY] || [];
+        console.log('Rules to export:', rules);
+        
+        if (rules.length === 0) {
+            alert('没有规则可以导出！');
+            return;
+        }
+        
+        const config = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            rules: rules
+        };
+        
+        const jsonStr = JSON.stringify(config, null, 2);
+        
+        // 使用data URL代替blob URL（避免CSP问题）
+        const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonStr);
+        
+        const filename = 'tab-grouping-rules-' + new Date().toISOString().slice(0, 10) + '.json';
+        
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        // 触发下载
+        a.click();
+        
+        // 延迟清理
+        setTimeout(() => {
+            document.body.removeChild(a);
+        }, 100);
+        
+        showStatus('配置已导出！', 'success');
+    });
+};
+
+// 导入配置
+function importConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const config = JSON.parse(e.target.result);
+            
+            // 验证配置格式
+            if (!config.rules || !Array.isArray(config.rules)) {
+                throw new Error('无效的配置文件格式');
+            }
+            
+            // 验证每个规则的格式
+            for (const rule of config.rules) {
+                if (!rule.name || !rule.patterns || !Array.isArray(rule.patterns)) {
+                    throw new Error('配置文件中包含无效的规则');
+                }
+            }
+            
+            // 询问是否覆盖现有配置
+            chrome.storage.sync.get([STORAGE_KEY], (result) => {
+                const existingRules = result[STORAGE_KEY] || [];
+                
+                let message = '将导入 ' + config.rules.length + ' 条规则。';
+                if (existingRules.length > 0) {
+                    message += '\n\n当前有 ' + existingRules.length + ' 条规则，导入后将被替换。';
+                }
+                message += '\n\n确定要导入吗？';
+                
+                if (confirm(message)) {
+                    chrome.storage.sync.set({ [STORAGE_KEY]: config.rules }, () => {
+                        if (chrome.runtime.lastError) {
+                            showStatus('导入失败: ' + chrome.runtime.lastError.message, 'error');
+                        } else {
+                            showStatus('成功导入 ' + config.rules.length + ' 条规则！', 'success');
+                            loadRules();
+                        }
+                    });
+                }
+            });
+            
+        } catch (error) {
+            showStatus('导入失败: ' + error.message, 'error');
+        }
+    };
+    
+    reader.readAsText(file);
+    
+    // 重置文件输入，允许重复导入同一文件
+    event.target.value = '';
+};
+
+
+// 清空所有规则
+function clearAllRules() {
+    chrome.storage.sync.get([STORAGE_KEY], (result) => {
+        const rules = result[STORAGE_KEY] || [];
+        
+        if (rules.length === 0) {
+            alert('当前没有规则！');
+            return;
+        }
+        
+        if (confirm('确定要清空所有 ' + rules.length + ' 条规则吗？\n\n此操作不可恢复！')) {
+            chrome.storage.sync.set({ [STORAGE_KEY]: [] }, () => {
+                if (chrome.runtime.lastError) {
+                    showStatus('清空失败: ' + chrome.runtime.lastError.message, 'error');
+                } else {
+                    showStatus('已清空所有规则！', 'success');
+                    loadRules();
+                }
+            });
+        }
+    });
+}
