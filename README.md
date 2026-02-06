@@ -1,4 +1,4 @@
-# 基于 chrome扩展商店 [Tab Saver Pro - Export & Backup Tabs]([https://github.com/xulihang/ImageTrans-docs](https://chromewebstore.google.com/detail/tab-saver-pro-export-back/bnchalepdedebdnegjkbpihkgngnmfmk)) 进行修改 
+# 基于 chrome扩展商店 [([Tab Saver Pro - Export & Backup Tabs](https://chromewebstore.google.com/detail/tab-saver-pro-export-back/bnchalepdedebdnegjkbpihkgngnmfmk)) 进行修改 
 
 # 工具栏添标签组显示增强 
 
