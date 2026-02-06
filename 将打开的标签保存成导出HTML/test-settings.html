@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试设置页面</title>
+</head>
+<body>
+    <h1>测试页面</h1>
+    <button id="testButton">测试按钮</button>
+    <div id="output"></div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Test page loaded');
+            
+            const button = document.getElementById('testButton');
+            button.addEventListener('click', () => {
+                console.log('Button clicked!');
+                document.getElementById('output').textContent = '按钮点击成功！';
+                
+                // 测试 Chrome Storage
+                chrome.storage.sync.set({ test: 'value' }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error('Storage error:', chrome.runtime.lastError);
+                        document.getElementById('output').textContent += '\nStorage 错误: ' + chrome.runtime.lastError.message;
+                    } else {
+                        console.log('Storage test successful');
+                        document.getElementById('output').textContent += '\nStorage 测试成功！';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

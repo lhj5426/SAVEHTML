@@ -626,6 +626,7 @@ async function getProfileInfo() {
         <button class="button" onclick="window.openTabsBySelector('.tab-entry')">打开全部标签</button>
         <button class="button" onclick="window.openTabsBySelector('.views > .active .tab-entry:not(.hidden)')">打开过滤后的标签</button>
         <button class="button" id="openSelectedButton" onclick="window.openTabsBySelector('.tab-checkbox:checked')" disabled>打开选中的标签</button>
+        <button class="button" style="background: #F44336;" onclick="window.clearVisitHistory()">清除访问历史</button>
       </div>
       <div class="selection-bar">
          <input type="checkbox" id="selectAllCheckbox" onchange="window.toggleSelectAll(this.checked)">
@@ -704,21 +705,21 @@ async function getProfileInfo() {
 
           if (visitTimeEl && lastVisited) {
               const visitDate = new Date(lastVisited);
-              visitTimeEl.textContent = \`上次访问: \${visitDate.toLocaleString()}\`;
+              visitTimeEl.textContent = '上次访问: ' + visitDate.toLocaleString();
           }
           if (visitCountEl && count > 0) {
-              visitCountEl.textContent = \`访问 \${count} 次\`;
+              visitCountEl.textContent = '访问 ' + count + ' 次';
           }
           
           if (titleLink) {
               // Remove all previous color classes
               for (let i = 1; i <= 7; i++) {
-                  titleLink.classList.remove(\`visited-count-\${i}\`);
+                  titleLink.classList.remove('visited-count-' + i);
               }
               // Add the new color class based on the count, cycling through 7 colors
               if (count > 0) {
                   const colorIndex = ((count - 1) % 7) + 1;
-                  titleLink.classList.add(\`visited-count-\${colorIndex}\`);
+                  titleLink.classList.add('visited-count-' + colorIndex);
               }
           }
       }
@@ -773,6 +774,32 @@ async function getProfileInfo() {
               }
           });
       }
+
+      // --- Clear Visit History Function ---
+      window.clearVisitHistory = function() {
+          try {
+              localStorage.removeItem(STORAGE_KEY);
+              
+              // 清除页面上所有的访问信息显示
+              document.querySelectorAll('.tab-entry').forEach(entry => {
+                  const visitTimeEl = entry.querySelector('.visit-time');
+                  const visitCountEl = entry.querySelector('.visit-count');
+                  const titleLink = entry.querySelector('.tab-title');
+                  
+                  if (visitTimeEl) visitTimeEl.textContent = '';
+                  if (visitCountEl) visitCountEl.textContent = '';
+                  
+                  // 移除所有彩虹颜色类
+                  if (titleLink) {
+                      for (let i = 1; i <= 7; i++) {
+                          titleLink.classList.remove('visited-count-' + i);
+                      }
+                  }
+              });
+          } catch (e) {
+              console.error('清除访问历史时出错:', e);
+          }
+      };
 
       // --- Core Tab Opening Logic ---
       window.openTabsBySelector = function(selector) {

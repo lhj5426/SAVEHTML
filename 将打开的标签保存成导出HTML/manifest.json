@@ -15,7 +15,8 @@
     "downloads",
     "identity",
     "identity.email",
-    "tabGroups"
+    "tabGroups",
+    "storage"
   ],
   "action": {
     "default_popup": "popup.html",

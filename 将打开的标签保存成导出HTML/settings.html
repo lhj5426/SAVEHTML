@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分组规则设置</title>
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --primary-dark: #1976D2;
+            --success-color: #4CAF50;
+            --danger-color: #F44336;
+            --surface-color: #FFFFFF;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #E0E0E0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: var(--text-primary);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 24px;
+            color: var(--text-primary);
+        }
+
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .button-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .button-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .button-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .button-success:hover {
+            background: #388E3C;
+        }
+
+        .button-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .button-danger:hover {
+            background: #D32F2F;
+        }
+
+        .rule-list {
+            margin-bottom: 24px;
+        }
+
+        .rule-item {
+            background: #f9f9f9;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .rule-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .rule-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .rule-patterns {
+            margin-top: 8px;
+        }
+
+        .pattern-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border: 1px solid #e0e0e0;
+        }
+
+        .add-rule-form {
+            background: #f0f7ff;
+            border: 2px dashed var(--primary-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+
+        textarea.form-input {
+            min-height: 100px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+        }
+
+        .color-picker-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: #333;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #333;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .example-box {
+            background: #fffbf0;
+            border-left: 4px solid #FFA000;
+            padding: 12px;
+            margin-top: 8px;
+            border-radius: 4px;
+        }
+
+        .example-title {
+            font-weight: 600;
+            color: #F57C00;
+            margin-bottom: 6px;
+        }
+
+        .example-item {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #666;
+            margin: 4px 0;
+        }
+
+        .status-message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .status-success {
+            background: #E8F5E9;
+            color: #2E7D32;
+            border: 1px solid #4CAF50;
+        }
+
+        .status-error {
+            background: #FFEBEE;
+            color: #C62828;
+            border: 1px solid #F44336;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 标签分组规则设置</h1>
+            <button class="button button-primary" onclick="window.close()">关闭</button>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="add-rule-form">
+            <h2 style="margin-bottom: 16px; font-size: 18px;">➕ 添加新规则</h2>
+            
+            <div class="form-group">
+                <label class="form-label">规则名称</label>
+                <input type="text" id="ruleName" class="form-input" placeholder="例如: 浏览_1">
+                <div class="help-text">给这个分组规则起个名字</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">匹配模式（每行一个）</label>
+                <textarea id="rulePatterns" class="form-input" placeholder="exhentai.org/s/*&#10;https://www.wnacg.com/photos-view-*&#10;exhentai.org/tag/artist*"></textarea>
+                <div class="help-text">支持通配符 * 匹配任意字符</div>
+                <div class="example-box">
+                    <div class="example-title">📝 示例:</div>
+                    <div class="example-item">exhentai.org/s/* - 匹配该域名下所有 /s/ 开头的页面</div>
+                    <div class="example-item">https://exhentai.org/tag/artist* - 匹配艺术家标签页</div>
+                    <div class="example-item">exhentai.org/tag/group* - 匹配社团标签页</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">分组颜色</label>
+                <div class="color-picker-group" id="colorPicker">
+                    <div class="color-option" data-color="blue" style="background: #1A73E8;"></div>
+                    <div class="color-option" data-color="red" style="background: #D93025;"></div>
+                    <div class="color-option" data-color="yellow" style="background: #F9AB00;"></div>
+                    <div class="color-option" data-color="green" style="background: #1E8E3E;"></div>
+                    <div class="color-option" data-color="pink" style="background: #D01884;"></div>
+                    <div class="color-option" data-color="purple" style="background: #9334E6;"></div>
+                    <div class="color-option" data-color="cyan" style="background: #12B5CB;"></div>
+                    <div class="color-option" data-color="orange" style="background: #FA903E;"></div>
+                    <div class="color-option" data-color="grey" style="background: #5F6368;"></div>
+                </div>
+            </div>
+
+            <button class="button button-success" id="addRuleButton" style="width: 100%;">
+                ✓ 添加规则
+            </button>
+        </div>
+
+        <div class="rule-list">
+            <h2 style="margin-bottom: 16px; font-size: 18px;">📋 已保存的规则</h2>
+            <div id="rulesList"></div>
+        </div>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+</html>
