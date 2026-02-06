@@ -9,7 +9,8 @@
 
 # 增加自定义分组规则
 
-<img width="889" height="972" alt="image" src="https://github.com/user-attachments/assets/12ada7cf-7f6e-4c81-9aca-becac254466f" />
+<img width="843" height="959" alt="image" src="https://github.com/user-attachments/assets/88ebb72d-819e-4828-b048-1346e34544c4" />
+
 
 
 # 修改保存后的HTML功能
