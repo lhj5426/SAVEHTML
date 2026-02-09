@@ -456,3 +456,254 @@ document.getElementById('ungroupButton').addEventListener('click', async () => {
         button.innerHTML = originalHTML;
     }
 });
+
+
+// 按域名排序标签
+document.getElementById('sortByDomainButton').addEventListener('click', async () => {
+    try {
+        const button = document.getElementById('sortByDomainButton');
+        const originalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '正在排序...';
+        
+        // 获取当前窗口的所有标签
+        const currentWindow = await chrome.windows.getCurrent();
+        const tabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        
+        // 按域名分组并排序
+        function getDomain(url) {
+            try {
+                const hostname = new URL(url).hostname.replace('www.', '');
+                const parts = hostname.split('.');
+                return parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
+            } catch (e) {
+                return 'zzz_other'; // 无效URL排到最后
+            }
+        }
+        
+        // 创建排序数组：[{domain, tab}, ...]
+        const sortedData = tabs.map(tab => ({
+            domain: getDomain(tab.url),
+            tab: tab
+        })).sort((a, b) => {
+            // 先按域名排序
+            const domainCompare = a.domain.localeCompare(b.domain);
+            if (domainCompare !== 0) return domainCompare;
+            // 域名相同时按标题排序
+            return (a.tab.title || '').localeCompare(b.tab.title || '');
+        });
+        
+        // 移动标签到新位置
+        for (let i = 0; i < sortedData.length; i++) {
+            await chrome.tabs.move(sortedData[i].tab.id, { index: i });
+        }
+        
+        // 刷新显示
+        await updateStats();
+        
+        // 显示成功消息
+        button.innerHTML = '✓ 排序完成';
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error sorting by domain:', error);
+        alert('按域名排序时出错: ' + error.message);
+        
+        const button = document.getElementById('sortByDomainButton');
+        button.disabled = false;
+        button.innerHTML = '域名排序';
+    }
+});
+
+// 按标题排序标签
+document.getElementById('sortByTitleButton').addEventListener('click', async () => {
+    try {
+        const button = document.getElementById('sortByTitleButton');
+        const originalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '正在排序...';
+        
+        // 获取当前窗口的所有标签
+        const currentWindow = await chrome.windows.getCurrent();
+        const tabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        
+        // 按标题排序（忽略大小写）
+        const sortedTabs = [...tabs].sort((a, b) => {
+            const titleA = (a.title || '').toLowerCase();
+            const titleB = (b.title || '').toLowerCase();
+            return titleA.localeCompare(titleB);
+        });
+        
+        // 移动标签到新位置
+        for (let i = 0; i < sortedTabs.length; i++) {
+            await chrome.tabs.move(sortedTabs[i].id, { index: i });
+        }
+        
+        // 刷新显示
+        await updateStats();
+        
+        // 显示成功消息
+        button.innerHTML = '✓ 排序完成';
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error sorting by title:', error);
+        alert('按标题排序时出错: ' + error.message);
+        
+        const button = document.getElementById('sortByTitleButton');
+        button.disabled = false;
+        button.innerHTML = '标题排序';
+    }
+});
+
+
+// 反向排序标签
+document.getElementById('reverseSortButton').addEventListener('click', async () => {
+    try {
+        const button = document.getElementById('reverseSortButton');
+        const originalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '正在反转...';
+        
+        // 获取当前窗口的所有标签
+        const currentWindow = await chrome.windows.getCurrent();
+        const tabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        
+        // 反转标签顺序
+        const reversedTabs = [...tabs].reverse();
+        
+        // 移动标签到新位置
+        for (let i = 0; i < reversedTabs.length; i++) {
+            await chrome.tabs.move(reversedTabs[i].id, { index: i });
+        }
+        
+        // 刷新显示
+        await updateStats();
+        
+        // 显示成功消息
+        button.innerHTML = '✓ 反转完成';
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error reversing tabs:', error);
+        alert('反向排序时出错: ' + error.message);
+        
+        const button = document.getElementById('reverseSortButton');
+        button.disabled = false;
+        button.innerHTML = '反向排序';
+    }
+});
+
+
+// 删除重复标签
+document.getElementById('removeDuplicatesButton').addEventListener('click', async () => {
+    try {
+        const button = document.getElementById('removeDuplicatesButton');
+        const originalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '正在去重...';
+        
+        // 获取当前窗口的所有标签
+        const currentWindow = await chrome.windows.getCurrent();
+        const tabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        
+        // 记录已见过的URL和要关闭的标签ID
+        const seenUrls = new Set();
+        const tabsToClose = [];
+        
+        // 遍历标签,保留第一个,标记后续重复的
+        tabs.forEach(tab => {
+            if (seenUrls.has(tab.url)) {
+                // 这是重复的标签
+                tabsToClose.push(tab.id);
+            } else {
+                // 第一次见到这个URL
+                seenUrls.add(tab.url);
+            }
+        });
+        
+        if (tabsToClose.length === 0) {
+            button.innerHTML = '✓ 没有重复';
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            }, 2000);
+            return;
+        }
+        
+        // 关闭重复的标签
+        await chrome.tabs.remove(tabsToClose);
+        
+        // 刷新显示
+        await updateStats();
+        
+        // 显示成功消息
+        button.innerHTML = `✓ 已删除 ${tabsToClose.length} 个重复`;
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error removing duplicates:', error);
+        alert('删除重复标签时出错: ' + error.message);
+        
+        const button = document.getElementById('removeDuplicatesButton');
+        button.disabled = false;
+        button.innerHTML = '去重标签';
+    }
+});
+
+// 克隆当前激活的标签
+document.getElementById('cloneActiveTabButton').addEventListener('click', async () => {
+    try {
+        const button = document.getElementById('cloneActiveTabButton');
+        const originalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '正在克隆...';
+        
+        // 获取当前激活的标签
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        if (!activeTab) {
+            alert('没有找到当前激活的标签');
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+            return;
+        }
+        
+        // 克隆标签(在当前标签后面创建)
+        await chrome.tabs.create({
+            url: activeTab.url,
+            index: activeTab.index + 1,
+            active: false  // 不激活新标签,保持在当前标签
+        });
+        
+        // 刷新显示
+        await updateStats();
+        
+        // 显示成功消息
+        button.innerHTML = '✓ 克隆成功';
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error cloning tab:', error);
+        alert('克隆标签时出错: ' + error.message);
+        
+        const button = document.getElementById('cloneActiveTabButton');
+        button.disabled = false;
+        button.innerHTML = '克隆标签';
+    }
+});
