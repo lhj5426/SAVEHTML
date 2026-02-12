@@ -210,7 +210,7 @@ async function getProfileInfo() {
     return colorMap[colorName] || colorMap['grey'];
   }
   
-  function generateTabEntry(tab) {
+  function generateTabEntry(tab, index = null) {
     // 尝试解码URL，如果需要解码则返回解码结果，否则返回null
     const decodedUrl = decodeUrlIfNeeded(tab.url);
     
@@ -219,9 +219,15 @@ async function getProfileInfo() {
       `<div class="tab-decoded-url">URL解码: ${decodedUrl}</div>` : 
       '';
     
+    // 序号HTML (如果提供了index)
+    const indexHtml = index !== null ? 
+      `<span class="tab-index">${index}</span>` : 
+      '';
+    
     // 修正点：确保返回的HTML模板中没有多余的注释文本
     return `
       <div class="tab-entry" data-url="${tab.url}" data-title="${tab.title || ''}">
+        ${indexHtml}
         <input type="checkbox" class="tab-checkbox" onclick="window.updateSelectionState()">
         <img class="tab-icon" src="${tab.favIconUrl || ''}" onerror="this.style.backgroundColor='#e0e0e0'">
         <div class="tab-content">
@@ -292,7 +298,7 @@ async function getProfileInfo() {
           <span class="toggle-icon">▾</span>
         </div>
         <div class="group-content">
-          ${groupData.tabs.map(tab => generateTabEntry(tab)).join('')}
+          ${groupData.tabs.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
         </div>
       </div>
     `).join('');
@@ -307,7 +313,7 @@ async function getProfileInfo() {
           <span class="toggle-icon">▾</span>
         </div>
         <div class="group-content">
-          ${ungroupedTabs.map(tab => generateTabEntry(tab)).join('')}
+          ${ungroupedTabs.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
         </div>
       </div>
     ` : '';
@@ -437,6 +443,15 @@ async function getProfileInfo() {
       }
       .tab-entry.selected {
         background-color: #e3f2fd;
+      }
+      .tab-index {
+        min-width: 30px;
+        text-align: right;
+        font-weight: bold;
+        color: #666;
+        font-size: 14px;
+        margin-top: 2px;
+        flex-shrink: 0;
       }
       .tab-checkbox {
           margin-top: 2px;
@@ -650,15 +665,15 @@ async function getProfileInfo() {
     
     <div class="views">
       <div class="tabs-container active" id="recent">
-        ${tabsByLastAccessed.map(tab => generateTabEntry(tab)).join('')}
+        ${tabsByLastAccessed.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
       </div>
       
       <div class="tabs-container" id="alphabetical">
-        ${tabsByTitle.map(tab => generateTabEntry(tab)).join('')}
+        ${tabsByTitle.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
       </div>
       
       <div class="tabs-container" id="url">
-        ${tabsByUrl.map(tab => generateTabEntry(tab)).join('')}
+        ${tabsByUrl.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
       </div>
       
       <div class="tabs-container" id="byTabGroup">
@@ -677,7 +692,7 @@ async function getProfileInfo() {
               <span class="toggle-icon">▾</span>
             </div>
             <div class="group-content">
-              ${domainTabs.map(tab => generateTabEntry(tab)).join('')}
+              ${domainTabs.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
             </div>
           </div>
         `).join('')}
