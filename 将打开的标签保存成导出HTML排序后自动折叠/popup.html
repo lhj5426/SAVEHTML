@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --primary-dark: #1976D2;
+            --surface-color: #FFFFFF;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #E0E0E0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            width: 320px;
+            padding: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--surface-color);
+            color: var(--text-primary);
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;  /* Reduced from 12px */
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stats {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;  /* Reduced from 8px */
+            padding: 8px 12px;
+            background: #F5F5F5;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-secondary);
+        }
+
+        .stat-value {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .group-details {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #E3F2FD;
+            border-radius: 6px;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .group-detail-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            color: var(--text-secondary);
+        }
+        
+        .group-color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        
+        .group-detail-name {
+            flex-grow: 1;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .group-detail-count {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: var(--primary-color);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .button:hover {
+            background: var(--primary-dark);
+        }
+
+        .button svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .footer {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 2px;  /* Reduced from 4px */
+        }
+
+        #status {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-align: center;
+            min-height: 16px;  /* Reduced from 20px */
+            margin: 0;  /* Added to ensure no extra space */
+        }
+
+        /* Settings Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .close-button {
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+        }
+
+        .close-button:hover {
+            color: #000;
+        }
+
+        .rule-item {
+            background: #f5f5f5;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .rule-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .rule-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            font-size: 16px;
+        }
+
+        .icon-button:hover {
+            opacity: 0.7;
+        }
+
+        .rule-patterns {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .add-rule-button {
+            width: 100%;
+            padding: 10px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+
+        .add-rule-button:hover {
+            background: var(--primary-dark);
+        }
+
+        .rule-editor {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 13px;
+            min-height: 80px;
+            resize: vertical;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .color-option.selected {
+            border-color: #000;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #000;
+        }
+
+        .button-group-modal {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .button-modal {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .button-save {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .button-cancel {
+            background: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="icons/icon48.png" alt="T打开的标签保存成HTML" class="logo">
+            <h1 class="title">打开的标签保存成HTML</h1>
+        </header>
+
+        <div class="stats">
+            <div class="stat-row">
+                <span>打开的窗口总数</span>
+                <span class="stat-value" id="windowCount">0</span>
+            </div>
+            <div class="stat-row">
+                <span>打开的标签总数</span>
+                <span class="stat-value" id="tabCount">0</span>
+            </div>
+            <div class="stat-row">
+                <span>标签组数量</span>
+                <span class="stat-value" id="groupCount">0</span>
+            </div>
+            <div class="stat-row">
+                <span>域名数量</span>
+                <span class="stat-value" id="domainCount">0</span>
+            </div>
+            <div class="stat-row">
+                <span>固定标签数</span>
+                <span class="stat-value" id="pinnedCount">0</span>
+            </div>
+        </div>
+        
+        <div id="groupDetails" class="group-details"></div>
+        <div id="domainDetails" class="group-details" style="display: none;"></div>
+
+        <div class="button-grid">
+            <button id="saveButton" class="button">保存标签</button>
+            <button id="updateGroupNamesButton" class="button" style="background: #4CAF50;">序号组名</button>
+            <button id="groupByDomainButton" class="button" style="background: #FF9800;">按域名分</button>
+            <button id="groupByRulesButton" class="button" style="background: #9C27B0;">按规则分</button>
+            <button id="ungroupButton" class="button" style="background: #F44336;">解散分组</button>
+            <button id="settingsButton" class="button" style="background: #607D8B;">分组设置</button>
+            <button id="sortByDomainButton" class="button" style="background: #00BCD4;">域名排序</button>
+            <button id="sortByTitleButton" class="button" style="background: #3F51B5;">标题排序</button>
+            <button id="reverseSortButton" class="button" style="background: #546E7A;">反向排序</button>
+            <button id="removeDuplicatesButton" class="button" style="background: #E91E63;">去重标签</button>
+            <button id="cloneActiveTabButton" class="button" style="background: #00897B;">克隆标签</button>
+            <button id="saveExcludePinnedButton" class="button" style="background: #FF5722;">保存排固</button>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="footer">
+            点击将所有标签页保存为有序的HTML文件
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">分组规则设置</h2>
+                <button class="close-button" id="closeModal">&times;</button>
+            </div>
+            
+            <div id="rulesContainer"></div>
+            
+            <button class="add-rule-button" id="addRuleButton">+ 添加新规则</button>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+    <script src="popup-ui.js"></script>
+    <script src="popup-settings.js"></script>
+</body>
+</html>

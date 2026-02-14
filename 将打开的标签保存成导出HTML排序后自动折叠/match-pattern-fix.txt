@@ -1,0 +1,33 @@
+        // 用于匹配URL的函数
+        function matchPattern(url, pattern) {
+            try {
+                // 将通配符模式转换为正则表达式
+                let regexPattern = pattern;
+                
+                // 先把反斜杠转义（必须最先做）
+                regexPattern = regexPattern.replace(/\\/g, '\\\\');
+                
+                // 转义其他正则表达式特殊字符
+                regexPattern = regexPattern.replace(/\./g, '\\.');
+                regexPattern = regexPattern.replace(/\+/g, '\\+');
+                regexPattern = regexPattern.replace(/\?/g, '\\?');
+                regexPattern = regexPattern.replace(/\^/g, '\\^');
+                regexPattern = regexPattern.replace(/\$/g, '\\$');
+                regexPattern = regexPattern.replace(/\{/g, '\\{');
+                regexPattern = regexPattern.replace(/\}/g, '\\}');
+                regexPattern = regexPattern.replace(/\(/g, '\\(');
+                regexPattern = regexPattern.replace(/\)/g, '\\)');
+                regexPattern = regexPattern.replace(/\|/g, '\\|');
+                regexPattern = regexPattern.replace(/\[/g, '\\[');
+                regexPattern = regexPattern.replace(/\]/g, '\\]');
+                
+                // 最后将 * 转换为 .*
+                regexPattern = regexPattern.replace(/\*/g, '.*');
+                
+                const regex = new RegExp('^' + regexPattern + '$', 'i');
+                return regex.test(url);
+            } catch (e) {
+                console.error('Pattern match error:', e, 'Pattern:', pattern);
+                return false;
+            }
+        }
