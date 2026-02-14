@@ -208,7 +208,10 @@ document.getElementById('groupByDomainButton').addEventListener('click', async (
         
         // Get all tabs in current window
         const currentWindow = await chrome.windows.getCurrent();
-        const tabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        const allTabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        
+        // 排除固定标签
+        const tabs = allTabs.filter(tab => !tab.pinned);
         
         // Helper function to get domain from URL
         function getDomain(url) {
@@ -317,7 +320,10 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
         console.log('开始获取标签...');
         // 获取当前窗口的所有标签
         const currentWindow = await chrome.windows.getCurrent();
-        const tabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        const allTabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        
+        // 排除固定标签
+        const tabs = allTabs.filter(tab => !tab.pinned);
         
         console.log('获取到的标签数量:', tabs.length);
         console.log('标签列表:', tabs.map(t => ({ title: t.title, url: t.url })));
@@ -412,11 +418,11 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
         
         // 更新所有分组的标签数量（包括被规则分组影响的旧分组）
         const allGroups = await chrome.tabGroups.query({});
-        const allTabs = await chrome.tabs.query({ windowId: currentWindow.id });
+        const allTabsForCount = await chrome.tabs.query({ windowId: currentWindow.id });
         
         // 统计每个分组的实际标签数
         const groupTabCounts = {};
-        allTabs.forEach(tab => {
+        allTabsForCount.forEach(tab => {
             if (tab.groupId && tab.groupId !== -1) {
                 groupTabCounts[tab.groupId] = (groupTabCounts[tab.groupId] || 0) + 1;
             }
