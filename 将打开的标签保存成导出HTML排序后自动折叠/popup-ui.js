@@ -7,9 +7,50 @@ async function updateStats() {
         // Get tab groups
         const groups = await chrome.tabGroups.query({});
         
-        // Count pinned tabs
+        // Count pinned tabs (包括所有固定标签，不排除内部页面)
         const pinnedTabs = tabs.filter(tab => tab.pinned);
         const pinnedCount = pinnedTabs.length;
+        
+        // Count internal (non-web) tabs (只统计非固定的内部页面)
+        const internalTabs = tabs.filter(tab => {
+            if (tab.pinned) return false; // 排除固定标签
+            
+            const url = tab.url.toLowerCase();
+            return url.startsWith('chrome://') || 
+                   url.startsWith('edge://') || 
+                   url.startsWith('vivaldi://') || 
+                   url.startsWith('about:') ||
+                   url.startsWith('chrome-extension://') ||
+                   url.startsWith('edge-extension://') ||
+                   url.startsWith('extension://') ||
+                   url.startsWith('file://');
+        });
+        const internalCount = internalTabs.length;
+        
+        // Count unpinned web tabs (非固定的网址标签，排除内部页面)
+        const unpinnedWebTabs = tabs.filter(tab => {
+            if (tab.pinned) return false; // 排除固定标签
+            
+            const url = tab.url.toLowerCase();
+            // 排除内部页面
+            return !url.startsWith('chrome://') && 
+                   !url.startsWith('edge://') && 
+                   !url.startsWith('vivaldi://') && 
+                   !url.startsWith('about:') &&
+                   !url.startsWith('chrome-extension://') &&
+                   !url.startsWith('edge-extension://') &&
+                   !url.startsWith('extension://') &&
+                   !url.startsWith('file://');
+        });
+        const unpinnedCount = unpinnedWebTabs.length;
+        
+        // 调试信息
+        console.log('统计调试信息:');
+        console.log('总标签数:', tabs.length);
+        console.log('固定标签数:', pinnedCount);
+        console.log('非固定标签数:', unpinnedCount);
+        console.log('内部页面数:', internalCount);
+        console.log('计算验证: 固定+非固定=', pinnedCount + unpinnedCount, '应该等于总数', tabs.length);
         
         // Calculate domain groups
         const domainGroups = {};
@@ -30,6 +71,8 @@ async function updateStats() {
         document.getElementById('groupCount').textContent = groups.length;
         document.getElementById('domainCount').textContent = domainCount;
         document.getElementById('pinnedCount').textContent = pinnedCount;
+        document.getElementById('unpinnedCount').textContent = unpinnedCount;
+        document.getElementById('internalCount').textContent = internalCount;
         
         // Display detailed group information
         const groupDetails = document.getElementById('groupDetails');
@@ -925,10 +968,22 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
     status.textContent = '正在保存标签页(排除固定标签)...';
     
     try {
-        const tabs = await getAllTabs();
+        const allTabs = await getAllTabs();
         
-        // 过滤掉固定标签
-        const unpinnedTabs = tabs.filter(tab => !tab.pinned);
+        // 过滤掉固定标签和浏览器内部页面
+        const unpinnedTabs = allTabs.filter(tab => {
+            if (tab.pinned) return false;
+            
+            const url = tab.url.toLowerCase();
+            return !url.startsWith('chrome://') && 
+                   !url.startsWith('edge://') && 
+                   !url.startsWith('vivaldi://') && 
+                   !url.startsWith('about:') &&
+                   !url.startsWith('chrome-extension://') &&
+                   !url.startsWith('edge-extension://') &&
+                   !url.startsWith('extension://') &&
+                   !url.startsWith('file://');
+        });
         
         if (unpinnedTabs.length === 0) {
             status.textContent = '没有非固定标签可以保存';
@@ -970,7 +1025,7 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
             saveAs: !useDefaultPath // saveAs 为false时，不显示保存对话框
         });
         
-        status.textContent = `成功保存了 ${tabCount} 个标签(已排除固定标签)`;
+        status.textContent = `成功保存了 ${tabCount} 个标签(已排除固定标签和浏览器内部页面)`;
         
         // 5秒后重置状态文本
         setTimeout(() => {

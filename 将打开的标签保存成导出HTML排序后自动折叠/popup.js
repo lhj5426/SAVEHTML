@@ -1009,7 +1009,21 @@ async function getProfileInfo() {
     status.textContent = '正在保存标签页...';
     
     try {
-      const tabs = await getAllTabs();
+      const allTabs = await getAllTabs();
+      
+      // 过滤掉浏览器内部页面
+      const tabs = allTabs.filter(tab => {
+        const url = tab.url.toLowerCase();
+        return !url.startsWith('chrome://') && 
+               !url.startsWith('edge://') && 
+               !url.startsWith('vivaldi://') && 
+               !url.startsWith('about:') &&
+               !url.startsWith('chrome-extension://') &&
+               !url.startsWith('edge-extension://') &&
+               !url.startsWith('extension://') &&
+               !url.startsWith('file://');
+      });
+      
       const profile = await getProfileInfo();
       
       // Get tab groups information
