@@ -641,6 +641,7 @@ async function getProfileInfo() {
         <button class="button" onclick="window.openTabsBySelector('.tab-entry')">打开全部标签</button>
         <button class="button" onclick="window.openTabsBySelector('.views > .active .tab-entry:not(.hidden)')">打开过滤后的标签</button>
         <button class="button" id="openSelectedButton" onclick="window.openTabsBySelector('.tab-checkbox:checked')" disabled>打开选中的标签</button>
+        <button class="button" style="background: #FF9800;" id="toggleAllUrlsButton" onclick="window.toggleAllUrls()">一键展开所有URL</button>
         <button class="button" style="background: #F44336;" onclick="window.clearVisitHistory()">清除访问历史</button>
       </div>
       <div class="selection-bar">
@@ -864,6 +865,43 @@ async function getProfileInfo() {
           urlElement.classList.remove('expanded');
           urlElement.classList.add('collapsed');
           toggleElement.textContent = '▶ 显示URL';
+        }
+      };
+
+      // --- Toggle All URLs Function ---
+      let allUrlsExpanded = false;
+      window.toggleAllUrls = function() {
+        const button = document.getElementById('toggleAllUrlsButton');
+        const activeView = document.querySelector('.views > .active');
+        if (!activeView) return;
+
+        const allToggles = activeView.querySelectorAll('.tab-url-toggle');
+        const allUrls = activeView.querySelectorAll('.tab-url');
+
+        if (!allUrlsExpanded) {
+          // 展开所有URL
+          allUrls.forEach(url => {
+            url.classList.remove('collapsed');
+            url.classList.add('expanded');
+          });
+          allToggles.forEach(toggle => {
+            toggle.textContent = '▼ 隐藏URL';
+          });
+          button.textContent = '一键隐藏所有URL';
+          button.style.background = '#4CAF50';
+          allUrlsExpanded = true;
+        } else {
+          // 隐藏所有URL
+          allUrls.forEach(url => {
+            url.classList.remove('expanded');
+            url.classList.add('collapsed');
+          });
+          allToggles.forEach(toggle => {
+            toggle.textContent = '▶ 显示URL';
+          });
+          button.textContent = '一键展开所有URL';
+          button.style.background = '#FF9800';
+          allUrlsExpanded = false;
         }
       };
 
