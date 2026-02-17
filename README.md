@@ -21,4 +21,5 @@
 
 # 增加右键 关闭标签功能 
 
-<img width="497" height="285" alt="image" src="https://github.com/user-attachments/assets/2765bd3f-75cb-4750-ae19-8cb7374bb122" />
+
+<img width="573" height="399" alt="image" src="https://github.com/user-attachments/assets/7f1159d5-a677-4dc2-bc1d-ec37e1cdcaa3" />
