@@ -1004,7 +1004,11 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
         // Get tab groups information
         const tabGroups = await chrome.tabGroups.query({});
         
-        const html = generateHTML(unpinnedTabs, profile, tabGroups);
+        // Get grouping rules
+        const result = await chrome.storage.sync.get(['tabGroupingRules']);
+        const groupingRules = result.tabGroupingRules || [];
+        
+        const html = generateHTML(unpinnedTabs, profile, tabGroups, groupingRules);
         
         // Create blob and download
         const blob = new Blob([html], { type: 'text/html' });

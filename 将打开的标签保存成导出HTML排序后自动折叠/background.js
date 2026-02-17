@@ -67,6 +67,27 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 
   chrome.contextMenus.create({
+    id: 'removeDuplicates',
+    parentId: 'closeTabsParent',
+    title: '去重标签',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'cloneActiveTab',
+    parentId: 'closeTabsParent',
+    title: '克隆标签',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'separator2_5',
+    parentId: 'closeTabsParent',
+    type: 'separator',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
     id: 'closeWindow',
     parentId: 'closeTabsParent',
     title: '关闭窗口',
@@ -159,6 +180,33 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       case 'closeWindow':
         // 关闭当前窗口
         await chrome.windows.remove(windowId);
+        break;
+
+      case 'removeDuplicates':
+        // 去重标签
+        const seenUrls = new Set();
+        const tabsToClose = [];
+        
+        allTabs.forEach(t => {
+          if (seenUrls.has(t.url)) {
+            tabsToClose.push(t.id);
+          } else {
+            seenUrls.add(t.url);
+          }
+        });
+        
+        if (tabsToClose.length > 0) {
+          await chrome.tabs.remove(tabsToClose);
+        }
+        break;
+
+      case 'cloneActiveTab':
+        // 克隆当前标签
+        await chrome.tabs.create({
+          url: currentTab.url,
+          index: currentTab.index + 1,
+          active: false
+        });
         break;
 
       case 'openSettings':

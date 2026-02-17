@@ -65,6 +65,16 @@ async function getProfileInfo() {
     return allTabs;
   }
   
+  async function getGroupingRules() {
+    try {
+      const result = await chrome.storage.sync.get(['tabGroupingRules']);
+      return result.tabGroupingRules || [];
+    } catch (error) {
+      console.error('Error getting grouping rules:', error);
+      return [];
+    }
+  }
+  
   async function getTabGroups() {
     try {
       const groups = await chrome.tabGroups.query({});
@@ -210,6 +220,98 @@ async function getProfileInfo() {
     return colorMap[colorName] || colorMap['grey'];
   }
   
+  function generateRuleBasedGroups(tabs, rules) {
+    if (!rules || rules.length === 0) {
+      return '<div class="empty-state" style="text-align: center; padding: 40px; color: #666;"><p>没有配置分组规则</p></div>';
+    }
+    
+    function matchPattern(url, pattern) {
+      try {
+        let regexPattern = pattern;
+        regexPattern = regexPattern.replace(/\\/g, '\\\\');
+        regexPattern = regexPattern.replace(/\./g, '\\.');
+        regexPattern = regexPattern.replace(/\+/g, '\\+');
+        regexPattern = regexPattern.replace(/\?/g, '\\?');
+        regexPattern = regexPattern.replace(/\^/g, '\\^');
+        regexPattern = regexPattern.replace(/\$/g, '\\$');
+        regexPattern = regexPattern.replace(/\{/g, '\\{');
+        regexPattern = regexPattern.replace(/\}/g, '\\}');
+        regexPattern = regexPattern.replace(/\(/g, '\\(');
+        regexPattern = regexPattern.replace(/\)/g, '\\)');
+        regexPattern = regexPattern.replace(/\|/g, '\\|');
+        regexPattern = regexPattern.replace(/\[/g, '\\[');
+        regexPattern = regexPattern.replace(/\]/g, '\\]');
+        regexPattern = regexPattern.replace(/\*/g, '.*');
+        
+        const regex = new RegExp('^' + regexPattern + '$', 'i');
+        return regex.test(url);
+      } catch (e) {
+        return false;
+      }
+    }
+    
+    const matchedTabs = new Set();
+    const ruleGroups = [];
+    
+    rules.forEach(rule => {
+      const ruleTabs = [];
+      tabs.forEach(tab => {
+        if (!matchedTabs.has(tab.url)) {
+          const isMatch = rule.patterns.some(pattern => matchPattern(tab.url, pattern));
+          if (isMatch) {
+            ruleTabs.push(tab);
+            matchedTabs.add(tab.url);
+          }
+        }
+      });
+      
+      if (ruleTabs.length > 0) {
+        ruleGroups.push({
+          name: rule.name,
+          color: rule.color,
+          tabs: ruleTabs
+        });
+      }
+    });
+    
+    const unmatchedTabs = tabs.filter(tab => !matchedTabs.has(tab.url));
+    
+    let html = ruleGroups.map(group => `
+      <div class="tab-group">
+        <div class="group-header" onclick="window.toggleGroup(this)">
+          <span class="group-header-title">
+            <input type="checkbox" class="group-select-checkbox" onclick="window.toggleGroupSelection(this)">
+            <span class="group-color-indicator" style="background-color: ${getGroupColor(group.color)}"></span>
+            ${group.name} 【共有${group.tabs.length}个标签】
+          </span>
+          <span class="toggle-icon">▾</span>
+        </div>
+        <div class="group-content">
+          ${group.tabs.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
+        </div>
+      </div>
+    `).join('');
+    
+    if (unmatchedTabs.length > 0) {
+      html += `
+        <div class="tab-group">
+          <div class="group-header" onclick="window.toggleGroup(this)">
+            <span class="group-header-title">
+              <input type="checkbox" class="group-select-checkbox" onclick="window.toggleGroupSelection(this)">
+              未匹配标签 【共有${unmatchedTabs.length}个标签】
+            </span>
+            <span class="toggle-icon">▾</span>
+          </div>
+          <div class="group-content">
+            ${unmatchedTabs.map((tab, index) => generateTabEntry(tab, index + 1)).join('')}
+          </div>
+        </div>
+      `;
+    }
+    
+    return html;
+  }
+  
   function generateTabEntry(tab, index = null) {
     // 尝试解码URL，如果需要解码则返回解码结果，否则返回null
     const decodedUrl = decodeUrlIfNeeded(tab.url);
@@ -241,12 +343,22 @@ async function getProfileInfo() {
             <span class="visit-time"></span>
             <span class="visit-count"></span>
           </div>
+          <div class="tab-markers">
+            <label class="marker-checkbox marker-downloaded">
+              <input type="checkbox" class="marker-downloaded-cb" onchange="window.saveMarker(this, 'downloaded')">
+              <span>✓ 已下载</span>
+            </label>
+            <label class="marker-checkbox marker-skipped">
+              <input type="checkbox" class="marker-skipped-cb" onchange="window.saveMarker(this, 'skipped')">
+              <span>✗ 未下载</span>
+            </label>
+          </div>
         </div>
       </div>
     `;
   }
   
-  function generateHTML(tabs, profile, tabGroups = []) {
+  function generateHTML(tabs, profile, tabGroups = [], groupingRules = []) {
     const date = new Date().toLocaleString();
     const tabCount = tabs.length;
     const tabsByLastAccessed = sortTabs(tabs, 'lastAccessed', false);
@@ -286,6 +398,9 @@ async function getProfileInfo() {
         ungroupedTabs.push(tab);
       }
     });
+    
+    // Generate rule-based grouping view
+    const ruleGroupsHTML = generateRuleBasedGroups(tabs, groupingRules);
     
     const tabGroupsHTML = Object.entries(tabGroupsData).map(([groupId, groupData]) => `
       <div class="tab-group">
@@ -456,6 +571,45 @@ async function getProfileInfo() {
       .tab-checkbox {
           margin-top: 2px;
           cursor: pointer;
+      }
+      .tab-markers {
+          display: flex;
+          gap: 8px;
+          margin-top: 8px;
+          align-items: center;
+      }
+      .marker-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          cursor: pointer;
+          user-select: none;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 13px;
+          transition: background-color 0.2s;
+      }
+      .marker-checkbox:hover {
+          background-color: #f0f0f0;
+      }
+      .marker-checkbox input[type="checkbox"] {
+          cursor: pointer;
+          width: 16px;
+          height: 16px;
+      }
+      .marker-downloaded {
+          color: #4CAF50;
+          font-weight: 500;
+      }
+      .marker-downloaded input[type="checkbox"]:checked {
+          accent-color: #4CAF50;
+      }
+      .marker-skipped {
+          color: #F44336;
+          font-weight: 500;
+      }
+      .marker-skipped input[type="checkbox"]:checked {
+          accent-color: #F44336;
       }
       .tab-icon {
         width: 16px;
@@ -642,6 +796,7 @@ async function getProfileInfo() {
         <button class="button" onclick="window.openTabsBySelector('.views > .active .tab-entry:not(.hidden)')">打开过滤后的标签</button>
         <button class="button" id="openSelectedButton" onclick="window.openTabsBySelector('.tab-checkbox:checked')" disabled>打开选中的标签</button>
         <button class="button" style="background: #FF9800;" id="toggleAllUrlsButton" onclick="window.toggleAllUrls()">一键展开所有URL</button>
+        <button class="button" style="background: #9C27B0;" onclick="window.clearMarkers()">清除下载标记</button>
         <button class="button" style="background: #F44336;" onclick="window.clearVisitHistory()">清除访问历史</button>
       </div>
       <div class="selection-bar">
@@ -661,6 +816,7 @@ async function getProfileInfo() {
       <button class="view-button" data-view="alphabetical">按字母顺序</button>
       <button class="view-button" data-view="url">按网址</button>
       <button class="view-button" data-view="byTabGroup">按标签组</button>
+      <button class="view-button" data-view="byRules">按规则分组</button>
       <button class="view-button" data-view="grouped">按域名分组</button>
     </div>
     
@@ -680,6 +836,10 @@ async function getProfileInfo() {
       <div class="tabs-container" id="byTabGroup">
         ${tabGroupsHTML}
         ${ungroupedHTML}
+      </div>
+      
+      <div class="tabs-container" id="byRules">
+        ${ruleGroupsHTML}
       </div>
       
       <div class="tabs-container" id="grouped">
@@ -703,6 +863,7 @@ async function getProfileInfo() {
     
     <script>
       const STORAGE_KEY = 'tabSaverVisitedLinks';
+      const MARKERS_STORAGE_KEY = 'tabSaverMarkers';
       let popupNoticeShown = false;
 
       // --- 5.0 ULTIMATE: localStorage Logic with Rainbow Colors ---
@@ -711,6 +872,67 @@ async function getProfileInfo() {
               const data = localStorage.getItem(STORAGE_KEY);
               return data ? JSON.parse(data) : {};
           } catch (e) { return {}; }
+      }
+
+      // --- Markers Storage Functions ---
+      function getMarkers() {
+          try {
+              const data = localStorage.getItem(MARKERS_STORAGE_KEY);
+              return data ? JSON.parse(data) : {};
+          } catch (e) { return {}; }
+      }
+
+      function saveMarkerToStorage(url, markerType, checked) {
+          try {
+              const markers = getMarkers();
+              if (!markers[url]) {
+                  markers[url] = {};
+              }
+              markers[url][markerType] = checked;
+              localStorage.setItem(MARKERS_STORAGE_KEY, JSON.stringify(markers));
+          } catch (e) {
+              console.error('Error saving marker:', e);
+          }
+      }
+
+      window.saveMarker = function(checkbox, markerType) {
+          const tabEntry = checkbox.closest('.tab-entry');
+          if (!tabEntry) return;
+          
+          const url = tabEntry.dataset.url;
+          const checked = checkbox.checked;
+          
+          // 如果是互斥的标记,取消另一个
+          if (checked) {
+              const otherType = markerType === 'downloaded' ? 'skipped' : 'downloaded';
+              const otherCheckbox = tabEntry.querySelector(
+                  markerType === 'downloaded' ? '.marker-skipped-cb' : '.marker-downloaded-cb'
+              );
+              if (otherCheckbox && otherCheckbox.checked) {
+                  otherCheckbox.checked = false;
+                  saveMarkerToStorage(url, otherType, false);
+              }
+          }
+          
+          saveMarkerToStorage(url, markerType, checked);
+      };
+
+      function applyMarkers() {
+          const markers = getMarkers();
+          document.querySelectorAll('.tab-entry').forEach(entry => {
+              const url = entry.dataset.url;
+              if (markers[url]) {
+                  const downloadedCb = entry.querySelector('.marker-downloaded-cb');
+                  const skippedCb = entry.querySelector('.marker-skipped-cb');
+                  
+                  if (downloadedCb && markers[url].downloaded) {
+                      downloadedCb.checked = true;
+                  }
+                  if (skippedCb && markers[url].skipped) {
+                      skippedCb.checked = true;
+                  }
+              }
+          });
       }
 
       function updateVisitInfoInDOM(element, visitData) {
@@ -814,6 +1036,25 @@ async function getProfileInfo() {
               });
           } catch (e) {
               console.error('清除访问历史时出错:', e);
+          }
+      };
+
+      // --- Clear Markers Function ---
+      window.clearMarkers = function() {
+          if (!confirm('确定要清除所有下载标记吗？')) {
+              return;
+          }
+          try {
+              localStorage.removeItem(MARKERS_STORAGE_KEY);
+              
+              // 清除页面上所有的标记
+              document.querySelectorAll('.marker-downloaded-cb, .marker-skipped-cb').forEach(cb => {
+                  cb.checked = false;
+              });
+              
+              alert('已清除所有下载标记');
+          } catch (e) {
+              console.error('清除标记时出错:', e);
           }
       };
 
@@ -1034,6 +1275,7 @@ async function getProfileInfo() {
       // Initial state on load
       document.addEventListener('DOMContentLoaded', () => {
         applyVisitHistory(); 
+        applyMarkers();
         window.updateSelectionState();
       });
     </script>
@@ -1067,7 +1309,11 @@ async function getProfileInfo() {
       // Get tab groups information
       const tabGroups = await chrome.tabGroups.query({});
       
-      const html = generateHTML(tabs, profile, tabGroups);
+      // Get grouping rules
+      const result = await chrome.storage.sync.get(['tabGroupingRules']);
+      const groupingRules = result.tabGroupingRules || [];
+      
+      const html = generateHTML(tabs, profile, tabGroups, groupingRules);
       
       // 更新统计信息
       document.getElementById('tabCount').textContent = tabs.length;
