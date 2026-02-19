@@ -795,6 +795,7 @@ async function getProfileInfo() {
         <button class="button" onclick="window.openTabsBySelector('.tab-entry')">打开全部标签</button>
         <button class="button" onclick="window.openTabsBySelector('.views > .active .tab-entry:not(.hidden)')">打开过滤后的标签</button>
         <button class="button" id="openSelectedButton" onclick="window.openTabsBySelector('.tab-checkbox:checked')" disabled>打开选中的标签</button>
+        <button class="button" style="background: #2196F3;" id="toggleAllGroupsButton" onclick="window.toggleAllGroups()">展开全部分组</button>
         <button class="button" style="background: #FF9800;" id="toggleAllUrlsButton" onclick="window.toggleAllUrls()">一键展开所有URL</button>
         <button class="button" style="background: #9C27B0;" onclick="window.clearMarkers()">清除下载标记</button>
         <button class="button" style="background: #F44336;" onclick="window.clearVisitHistory()">清除访问历史</button>
@@ -1266,6 +1267,34 @@ async function getProfileInfo() {
       window.toggleGroup = function(header) {
         header.classList.toggle('collapsed');
         header.nextElementSibling.classList.toggle('collapsed');
+      };
+
+      // 展开/折叠全部分组
+      window.toggleAllGroups = function() {
+        const button = document.getElementById('toggleAllGroupsButton');
+        const activeView = document.querySelector('.views > .active');
+        const allHeaders = activeView.querySelectorAll('.group-header');
+        
+        if (allHeaders.length === 0) return;
+        
+        // 检查是否有折叠的分组
+        const hasCollapsed = Array.from(allHeaders).some(header => header.classList.contains('collapsed'));
+        
+        if (hasCollapsed) {
+          // 展开全部
+          allHeaders.forEach(header => {
+            header.classList.remove('collapsed');
+            header.nextElementSibling.classList.remove('collapsed');
+          });
+          button.textContent = '折叠全部分组';
+        } else {
+          // 折叠全部
+          allHeaders.forEach(header => {
+            header.classList.add('collapsed');
+            header.nextElementSibling.classList.add('collapsed');
+          });
+          button.textContent = '展开全部分组';
+        }
       };
 
       // === 重新生成按规则分组的功能 ===
