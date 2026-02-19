@@ -18,7 +18,8 @@
 
 # 修改保存后的HTML功能
 
-<img width="1251" height="965" alt="image" src="https://github.com/user-attachments/assets/19cd8496-3f4c-4d52-82c2-5fd0e50c33c8" />
+<img width="1235" height="902" alt="image" src="https://github.com/user-attachments/assets/a4e9ef90-9a1e-40b6-81fd-e5b95e51ac98" />
+
 
 
 # 增加右键 功能
