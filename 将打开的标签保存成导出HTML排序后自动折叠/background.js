@@ -101,6 +101,71 @@ chrome.runtime.onInstalled.addListener(() => {
     contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
   });
 
+  // 分组功能
+  chrome.contextMenus.create({
+    id: 'updateGroupNames',
+    parentId: 'closeTabsParent',
+    title: '序号组名',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'groupByDomain',
+    parentId: 'closeTabsParent',
+    title: '按域名分',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'groupByRules',
+    parentId: 'closeTabsParent',
+    title: '按规则分',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'ungroupAll',
+    parentId: 'closeTabsParent',
+    title: '解散分组',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'separator5',
+    parentId: 'closeTabsParent',
+    type: 'separator',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  // 排序功能
+  chrome.contextMenus.create({
+    id: 'sortByDomain',
+    parentId: 'closeTabsParent',
+    title: '域名排序',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'sortByTitle',
+    parentId: 'closeTabsParent',
+    title: '标题排序',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'reverseSort',
+    parentId: 'closeTabsParent',
+    title: '反向排序',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
+  chrome.contextMenus.create({
+    id: 'separator6',
+    parentId: 'closeTabsParent',
+    type: 'separator',
+    contexts: ['page', 'frame', 'selection', 'link', 'editable', 'image', 'video', 'audio']
+  });
+
   chrome.contextMenus.create({
     id: 'openSettings',
     parentId: 'closeTabsParent',
@@ -215,8 +280,292 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           url: chrome.runtime.getURL('settings.html')
         });
         break;
+
+      case 'updateGroupNames':
+        // 序号组名
+        const groups = await chrome.tabGroups.query({ windowId: windowId });
+        const groupTabCounts = {};
+        allTabs.forEach(t => {
+          if (t.groupId && t.groupId !== -1) {
+            groupTabCounts[t.groupId] = (groupTabCounts[t.groupId] || 0) + 1;
+          }
+        });
+        
+        for (const group of groups) {
+          const tabCount = groupTabCounts[group.id] || 0;
+          let currentTitle = group.title || '未命名组';
+          currentTitle = currentTitle.replace(/_\d+$/, '');
+          const newTitle = `${currentTitle}_${tabCount}`;
+          await chrome.tabGroups.update(group.id, { 
+            title: newTitle,
+            collapsed: group.collapsed
+          });
+        }
+        break;
+
+      case 'groupByDomain':
+        // 按域名分组
+        const unpinnedTabs = allTabs.filter(t => !t.pinned);
+        const domainMap = {};
+        unpinnedTabs.forEach(t => {
+          const domain = getDomain(t.url);
+          if (!domainMap[domain]) {
+            domainMap[domain] = [];
+          }
+          domainMap[domain].push(t);
+        });
+        
+        const colors = ['blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange', 'grey'];
+        let colorIndex = 0;
+        
+        for (const [domain, domainTabs] of Object.entries(domainMap)) {
+          if (domainTabs.length > 1) {
+            const tabIds = domainTabs.map(t => t.id);
+            const groupId = await chrome.tabs.group({ tabIds: tabIds });
+            await chrome.tabGroups.update(groupId, {
+              title: `${domain}_${domainTabs.length}`,
+              color: colors[colorIndex % colors.length],
+              collapsed: true
+            });
+            colorIndex++;
+          }
+        }
+        break;
+
+      case 'groupByRules':
+        // 按规则分组 - 需要读取规则
+        const result = await chrome.storage.sync.get(['tabGroupingRules']);
+        const rules = result.tabGroupingRules || [];
+        
+        if (rules.length === 0) {
+          break;
+        }
+        
+        const unpinnedTabsForRules = allTabs.filter(t => !t.pinned);
+        
+        function matchPattern(url, pattern) {
+          try {
+            let regexPattern = pattern;
+            regexPattern = regexPattern.replace(/\\/g, '\\\\');
+            regexPattern = regexPattern.replace(/\./g, '\\.');
+            regexPattern = regexPattern.replace(/\+/g, '\\+');
+            regexPattern = regexPattern.replace(/\?/g, '\\?');
+            regexPattern = regexPattern.replace(/\^/g, '\\^');
+            regexPattern = regexPattern.replace(/\$/g, '\\$');
+            regexPattern = regexPattern.replace(/\{/g, '\\{');
+            regexPattern = regexPattern.replace(/\}/g, '\\}');
+            regexPattern = regexPattern.replace(/\(/g, '\\(');
+            regexPattern = regexPattern.replace(/\)/g, '\\)');
+            regexPattern = regexPattern.replace(/\|/g, '\\|');
+            regexPattern = regexPattern.replace(/\[/g, '\\[');
+            regexPattern = regexPattern.replace(/\]/g, '\\]');
+            regexPattern = regexPattern.replace(/\*/g, '.*');
+            const regex = new RegExp('^' + regexPattern + '$', 'i');
+            return regex.test(url);
+          } catch (e) {
+            return false;
+          }
+        }
+        
+        const matchedTabs = new Set();
+        let ruleColorIndex = 0;
+        
+        for (const rule of rules) {
+          const ruleTabs = [];
+          unpinnedTabsForRules.forEach(t => {
+            if (!matchedTabs.has(t.url)) {
+              const isMatch = rule.patterns.some(pattern => matchPattern(t.url, pattern));
+              if (isMatch) {
+                ruleTabs.push(t);
+                matchedTabs.add(t.url);
+              }
+            }
+          });
+          
+          if (ruleTabs.length > 0) {
+            const tabIds = ruleTabs.map(t => t.id);
+            await chrome.tabs.ungroup(tabIds);
+            const groupId = await chrome.tabs.group({ tabIds: tabIds });
+            await chrome.tabGroups.update(groupId, {
+              title: `${rule.name}_${ruleTabs.length}`,
+              color: rule.color || 'grey',
+              collapsed: true
+            });
+          }
+        }
+        break;
+
+      case 'ungroupAll':
+        // 解散所有分组
+        const groupedTabs = allTabs.filter(t => t.groupId !== -1);
+        if (groupedTabs.length > 0) {
+          const tabIds = groupedTabs.map(t => t.id);
+          await chrome.tabs.ungroup(tabIds);
+        }
+        break;
+
+      case 'sortByDomain':
+        // 按域名排序
+        await sortTabsInWindow(windowId, 'domain');
+        break;
+
+      case 'sortByTitle':
+        // 按标题排序
+        await sortTabsInWindow(windowId, 'title');
+        break;
+
+      case 'reverseSort':
+        // 反向排序
+        await reverseTabsInWindow(windowId);
+        break;
     }
   } catch (error) {
     console.error('右键菜单操作出错:', error);
   }
 });
+
+// 排序辅助函数
+async function sortTabsInWindow(windowId, sortBy) {
+  const allTabs = await chrome.tabs.query({ windowId: windowId });
+  const pinnedTabs = allTabs.filter(t => t.pinned);
+  const unpinnedTabs = allTabs.filter(t => !t.pinned);
+  
+  const groups = await chrome.tabGroups.query({ windowId: windowId });
+  const groupCollapsedStates = {};
+  groups.forEach(group => {
+    groupCollapsedStates[group.id] = group.collapsed;
+  });
+  
+  const tabsByGroup = {};
+  const ungroupedTabs = [];
+  
+  unpinnedTabs.forEach(tab => {
+    if (tab.groupId && tab.groupId !== -1) {
+      if (!tabsByGroup[tab.groupId]) {
+        tabsByGroup[tab.groupId] = [];
+      }
+      tabsByGroup[tab.groupId].push(tab);
+    } else {
+      ungroupedTabs.push(tab);
+    }
+  });
+  
+  function sortTabs(tabs) {
+    return [...tabs].sort((a, b) => {
+      if (sortBy === 'domain') {
+        const domainA = getDomain(a.url);
+        const domainB = getDomain(b.url);
+        const domainCompare = domainA.localeCompare(domainB);
+        if (domainCompare !== 0) return domainCompare;
+        return (a.title || '').localeCompare(b.title || '');
+      } else if (sortBy === 'title') {
+        return (a.title || '').localeCompare(b.title || '');
+      }
+      return 0;
+    });
+  }
+  
+  for (const groupId in tabsByGroup) {
+    tabsByGroup[groupId] = sortTabs(tabsByGroup[groupId]);
+  }
+  
+  const sortedUngrouped = sortTabs(ungroupedTabs);
+  
+  let currentIndex = pinnedTabs.length;
+  
+  for (const groupId in tabsByGroup) {
+    const groupTabs = tabsByGroup[groupId];
+    for (const tab of groupTabs) {
+      await chrome.tabs.move(tab.id, { index: currentIndex });
+      currentIndex++;
+    }
+  }
+  
+  for (const tab of sortedUngrouped) {
+    await chrome.tabs.move(tab.id, { index: currentIndex });
+    currentIndex++;
+  }
+  
+  await new Promise(resolve => setTimeout(resolve, 150));
+  
+  for (const [groupId, collapsed] of Object.entries(groupCollapsedStates)) {
+    try {
+      await chrome.tabGroups.update(parseInt(groupId), { collapsed: collapsed });
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+}
+
+// 反向排序辅助函数
+async function reverseTabsInWindow(windowId) {
+  const allTabs = await chrome.tabs.query({ windowId: windowId });
+  const pinnedTabs = allTabs.filter(t => t.pinned);
+  const unpinnedTabs = allTabs.filter(t => !t.pinned);
+  
+  const groups = await chrome.tabGroups.query({ windowId: windowId });
+  const groupCollapsedStates = {};
+  groups.forEach(group => {
+    groupCollapsedStates[group.id] = group.collapsed;
+  });
+  
+  const tabsByGroup = {};
+  const ungroupedTabs = [];
+  const tabGroupMap = {};
+  
+  unpinnedTabs.forEach(tab => {
+    if (tab.groupId && tab.groupId !== -1) {
+      tabGroupMap[tab.id] = tab.groupId;
+      if (!tabsByGroup[tab.groupId]) {
+        tabsByGroup[tab.groupId] = [];
+      }
+      tabsByGroup[tab.groupId].push(tab);
+    } else {
+      ungroupedTabs.push(tab);
+    }
+  });
+  
+  for (const groupId in tabsByGroup) {
+    tabsByGroup[groupId].reverse();
+  }
+  
+  ungroupedTabs.reverse();
+  
+  const groupedTabIds = Object.values(tabsByGroup).flat().map(tab => tab.id);
+  if (groupedTabIds.length > 0) {
+    await chrome.tabs.ungroup(groupedTabIds);
+  }
+  
+  let currentIndex = pinnedTabs.length;
+  const newGroupOrder = [];
+  
+  for (const groupId in tabsByGroup) {
+    const groupTabs = tabsByGroup[groupId];
+    const groupTabIds = [];
+    for (const tab of groupTabs) {
+      await chrome.tabs.move(tab.id, { index: currentIndex });
+      groupTabIds.push(tab.id);
+      currentIndex++;
+    }
+    newGroupOrder.push({ groupId: parseInt(groupId), tabIds: groupTabIds });
+  }
+  
+  for (const tab of ungroupedTabs) {
+    await chrome.tabs.move(tab.id, { index: currentIndex });
+    currentIndex++;
+  }
+  
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  for (const { groupId, tabIds } of newGroupOrder) {
+    const newGroupId = await chrome.tabs.group({ tabIds: tabIds });
+    const originalGroup = groups.find(g => g.id === groupId);
+    if (originalGroup) {
+      await chrome.tabGroups.update(newGroupId, {
+        title: originalGroup.title,
+        color: originalGroup.color,
+        collapsed: groupCollapsedStates[groupId] || false
+      });
+    }
+  }
+}
