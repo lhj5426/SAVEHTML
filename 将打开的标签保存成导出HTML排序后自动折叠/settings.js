@@ -78,9 +78,20 @@ function displayRules(rules) {
             <div class="rule-header">
                 <div class="rule-name">
                     <span class="color-indicator" style="background: ${colorMap[rule.color]};"></span>
+                    <span style="font-weight: 500;">#${ruleIndex + 1}</span>
                     <span>${rule.name}</span>
                 </div>
                 <div class="rule-actions">
+                    <button class="button move-up-btn" data-index="${ruleIndex}" 
+                            style="padding: 6px 10px; font-size: 12px; background: #607D8B;" 
+                            ${ruleIndex === 0 ? 'disabled' : ''}>
+                        ↑ 上移
+                    </button>
+                    <button class="button move-down-btn" data-index="${ruleIndex}" 
+                            style="padding: 6px 10px; font-size: 12px; background: #607D8B;" 
+                            ${ruleIndex === rules.length - 1 ? 'disabled' : ''}>
+                        ↓ 下移
+                    </button>
                     <button class="button button-primary edit-btn" data-index="${ruleIndex}" style="padding: 6px 12px; font-size: 12px;">
                         编辑
                     </button>
@@ -105,6 +116,22 @@ function displayRules(rules) {
             </div>
         </div>
     `).join('');
+    
+    // 添加上移按钮事件监听器
+    document.querySelectorAll('.move-up-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = parseInt(e.target.dataset.index);
+            moveRule(index, -1);
+        });
+    });
+    
+    // 添加下移按钮事件监听器
+    document.querySelectorAll('.move-down-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = parseInt(e.target.dataset.index);
+            moveRule(index, 1);
+        });
+    });
     
     // 添加编辑按钮事件监听器
     document.querySelectorAll('.edit-btn').forEach(btn => {
@@ -205,6 +232,41 @@ function addRule() {
             showStatus('规则添加成功！', 'success');
             loadRules();
             clearForm();
+        });
+    });
+}
+
+// 移动规则
+function moveRule(index, direction) {
+    console.log('moveRule called with index:', index, 'direction:', direction);
+    
+    chrome.storage.sync.get([STORAGE_KEY], (result) => {
+        if (chrome.runtime.lastError) {
+            console.error('Error getting storage:', chrome.runtime.lastError);
+            return;
+        }
+        
+        const rules = result[STORAGE_KEY] || [];
+        const newIndex = index + direction;
+        
+        // 检查边界
+        if (newIndex < 0 || newIndex >= rules.length) {
+            return;
+        }
+        
+        // 交换位置
+        [rules[index], rules[newIndex]] = [rules[newIndex], rules[index]];
+        
+        chrome.storage.sync.set({ [STORAGE_KEY]: rules }, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Error saving storage:', chrome.runtime.lastError);
+                showStatus('移动失败: ' + chrome.runtime.lastError.message, 'error');
+                return;
+            }
+            
+            console.log('Rule moved successfully');
+            showStatus('规则顺序已更新', 'success');
+            loadRules();
         });
     });
 }

@@ -342,6 +342,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
         
         const unpinnedTabsForRules = allTabs.filter(t => !t.pinned);
+        const pinnedTabsForRules = allTabs.filter(t => t.pinned);
         
         function matchPattern(url, pattern) {
           try {
@@ -367,31 +368,66 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           }
         }
         
-        const matchedTabs = new Set();
-        let ruleColorIndex = 0;
+        // 解散所有分组
+        const groupedTabIds = unpinnedTabsForRules.filter(t => t.groupId !== -1).map(t => t.id);
+        if (groupedTabIds.length > 0) {
+          await chrome.tabs.ungroup(groupedTabIds);
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        // 收集所有规则匹配的标签
+        const matchedTabIds = new Set();
+        const orderedGroups = [];
         
         for (const rule of rules) {
-          const ruleTabs = [];
-          unpinnedTabsForRules.forEach(t => {
-            if (!matchedTabs.has(t.url)) {
-              const isMatch = rule.patterns.some(pattern => matchPattern(t.url, pattern));
+          const matchedTabs = [];
+          
+          for (const tab of unpinnedTabsForRules) {
+            if (!matchedTabIds.has(tab.id)) {
+              const isMatch = rule.patterns.some(pattern => matchPattern(tab.url, pattern));
               if (isMatch) {
-                ruleTabs.push(t);
-                matchedTabs.add(t.url);
+                matchedTabs.push(tab);
+                matchedTabIds.add(tab.id);
               }
             }
-          });
-          
-          if (ruleTabs.length > 0) {
-            const tabIds = ruleTabs.map(t => t.id);
-            await chrome.tabs.ungroup(tabIds);
-            const groupId = await chrome.tabs.group({ tabIds: tabIds });
-            await chrome.tabGroups.update(groupId, {
-              title: `${rule.name}_${ruleTabs.length}`,
-              color: rule.color || 'grey',
-              collapsed: true
-            });
           }
+          
+          if (matchedTabs.length > 0) {
+            orderedGroups.push({ rule, tabs: matchedTabs });
+          }
+        }
+        
+        // 未匹配的标签
+        const unmatchedTabs = unpinnedTabsForRules.filter(t => !matchedTabIds.has(t.id));
+        
+        // 按规则顺序移动标签
+        let currentIndex = pinnedTabsForRules.length;
+        
+        for (const { tabs: ruleTabs } of orderedGroups) {
+          for (const tab of ruleTabs) {
+            await chrome.tabs.move(tab.id, { index: currentIndex });
+            currentIndex++;
+          }
+        }
+        
+        // 移动未匹配的标签到最后
+        for (const tab of unmatchedTabs) {
+          await chrome.tabs.move(tab.id, { index: currentIndex });
+          currentIndex++;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // 创建分组
+        for (const { rule, tabs: ruleTabs } of orderedGroups) {
+          const tabIds = ruleTabs.map(tab => tab.id);
+          const groupId = await chrome.tabs.group({ tabIds: tabIds });
+          
+          await chrome.tabGroups.update(groupId, {
+            title: `${rule.name}_${ruleTabs.length}`,
+            color: rule.color || 'grey',
+            collapsed: true
+          });
         }
         break;
 

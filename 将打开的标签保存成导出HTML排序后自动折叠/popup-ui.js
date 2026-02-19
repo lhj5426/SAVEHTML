@@ -4,9 +4,15 @@ async function updateStats() {
         const windows = await chrome.windows.getAll();
         const tabs = await chrome.tabs.query({});
         
-        // Get tab groups
-        const groups = await chrome.tabGroups.query({});
+        // 获取当前窗口的标签
+        const currentWindow = await chrome.windows.getCurrent();
+        const currentWindowTabs = await chrome.tabs.query({ windowId: currentWindow.id });
         
+        // Get tab groups (全部和当前窗口)
+        const groups = await chrome.tabGroups.query({});
+        const currentWindowGroups = await chrome.tabGroups.query({ windowId: currentWindow.id });
+        
+        // === 全部窗口统计 ===
         // Count pinned tabs (包括所有固定标签，不排除内部页面)
         const pinnedTabs = tabs.filter(tab => tab.pinned);
         const pinnedCount = pinnedTabs.length;
@@ -44,15 +50,7 @@ async function updateStats() {
         });
         const unpinnedCount = unpinnedWebTabs.length;
         
-        // 调试信息
-        console.log('统计调试信息:');
-        console.log('总标签数:', tabs.length);
-        console.log('固定标签数:', pinnedCount);
-        console.log('非固定标签数:', unpinnedCount);
-        console.log('内部页面数:', internalCount);
-        console.log('计算验证: 固定+非固定=', pinnedCount + unpinnedCount, '应该等于总数', tabs.length);
-        
-        // Calculate domain groups
+        // Calculate domain groups (全部)
         const domainGroups = {};
         tabs.forEach(tab => {
             try {
@@ -66,6 +64,73 @@ async function updateStats() {
         });
         const domainCount = Object.keys(domainGroups).length;
         
+        // === 当前窗口统计 ===
+        // Count pinned tabs in current window
+        const currentWindowPinnedTabs = currentWindowTabs.filter(tab => tab.pinned);
+        const currentWindowPinnedCount = currentWindowPinnedTabs.length;
+        
+        // Count internal tabs in current window (非固定的内部页面)
+        const currentWindowInternalTabs = currentWindowTabs.filter(tab => {
+            if (tab.pinned) return false;
+            
+            const url = tab.url.toLowerCase();
+            return url.startsWith('chrome://') || 
+                   url.startsWith('edge://') || 
+                   url.startsWith('vivaldi://') || 
+                   url.startsWith('about:') ||
+                   url.startsWith('chrome-extension://') ||
+                   url.startsWith('edge-extension://') ||
+                   url.startsWith('extension://') ||
+                   url.startsWith('file://');
+        });
+        const currentWindowInternalCount = currentWindowInternalTabs.length;
+        
+        // Count unpinned web tabs in current window
+        const currentWindowUnpinnedWebTabs = currentWindowTabs.filter(tab => {
+            if (tab.pinned) return false;
+            
+            const url = tab.url.toLowerCase();
+            return !url.startsWith('chrome://') && 
+                   !url.startsWith('edge://') && 
+                   !url.startsWith('vivaldi://') && 
+                   !url.startsWith('about:') &&
+                   !url.startsWith('chrome-extension://') &&
+                   !url.startsWith('edge-extension://') &&
+                   !url.startsWith('extension://') &&
+                   !url.startsWith('file://');
+        });
+        const currentWindowUnpinnedCount = currentWindowUnpinnedWebTabs.length;
+        
+        // Calculate domain groups in current window
+        const currentWindowDomainGroups = {};
+        currentWindowTabs.forEach(tab => {
+            try {
+                const hostname = new URL(tab.url).hostname.replace('www.', '');
+                const parts = hostname.split('.');
+                const domain = parts.length >= 2 ? parts.slice(-2).join('.') : hostname;
+                currentWindowDomainGroups[domain] = (currentWindowDomainGroups[domain] || 0) + 1;
+            } catch (e) {
+                // Skip invalid URLs
+            }
+        });
+        const currentWindowDomainCount = Object.keys(currentWindowDomainGroups).length;
+        
+        // 调试信息
+        console.log('=== 统计调试信息 ===');
+        console.log('全部窗口:');
+        console.log('  总标签数:', tabs.length);
+        console.log('  固定标签数:', pinnedCount);
+        console.log('  非固定标签数:', unpinnedCount);
+        console.log('  内部页面数:', internalCount);
+        console.log('当前窗口:');
+        console.log('  总标签数:', currentWindowTabs.length);
+        console.log('  固定标签数:', currentWindowPinnedCount);
+        console.log('  非固定标签数:', currentWindowUnpinnedCount);
+        console.log('  内部页面数:', currentWindowInternalCount);
+        console.log('  标签组数:', currentWindowGroups.length);
+        console.log('  域名数:', currentWindowDomainCount);
+        
+        // 更新全部窗口统计
         document.getElementById('windowCount').textContent = windows.length;
         document.getElementById('tabCount').textContent = tabs.length;
         document.getElementById('groupCount').textContent = groups.length;
@@ -73,6 +138,14 @@ async function updateStats() {
         document.getElementById('pinnedCount').textContent = pinnedCount;
         document.getElementById('unpinnedCount').textContent = unpinnedCount;
         document.getElementById('internalCount').textContent = internalCount;
+        
+        // 更新当前窗口统计
+        document.getElementById('currentWindowTabCount').textContent = currentWindowTabs.length;
+        document.getElementById('currentWindowPinnedCount').textContent = currentWindowPinnedCount;
+        document.getElementById('currentWindowUnpinnedCount').textContent = currentWindowUnpinnedCount;
+        document.getElementById('currentWindowInternalCount').textContent = currentWindowInternalCount;
+        document.getElementById('currentWindowGroupCount').textContent = currentWindowGroups.length;
+        document.getElementById('currentWindowDomainCount').textContent = currentWindowDomainCount;
         
         // Display detailed group information
         const groupDetails = document.getElementById('groupDetails');
@@ -290,6 +363,13 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStats();
 });
 
+// 折叠/展开当前窗口统计
+window.toggleCurrentWindowStats = function(header) {
+    header.classList.toggle('collapsed');
+    const content = header.nextElementSibling;
+    content.classList.toggle('collapsed');
+};
+
 
 
 // 按规则分组功能
@@ -324,6 +404,7 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
         
         // 排除固定标签
         const tabs = allTabs.filter(tab => !tab.pinned);
+        const pinnedTabs = allTabs.filter(tab => tab.pinned);
         
         console.log('获取到的标签数量:', tabs.length);
         console.log('标签列表:', tabs.map(t => ({ title: t.title, url: t.url })));
@@ -370,8 +451,17 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
             }
         }
         
-        // 为每个规则创建分组
-        let groupedCount = 0;
+        // 解散所有分组
+        const groupedTabs = tabs.filter(t => t.groupId !== -1);
+        if (groupedTabs.length > 0) {
+            const tabIds = groupedTabs.map(t => t.id);
+            await chrome.tabs.ungroup(tabIds);
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // 收集所有规则匹配的标签
+        const matchedTabIds = new Set();
+        const orderedGroups = [];
         
         for (const rule of rules) {
             console.log('=== 处理规则:', rule.name, '===');
@@ -380,69 +470,65 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
             
             // 找到匹配该规则的所有标签
             for (const tab of tabs) {
-                // 检查是否匹配任一模式
-                const isMatch = rule.patterns.some(pattern => {
-                    const result = matchPattern(tab.url, pattern);
-                    if (result) {
-                        console.log('✓ 匹配成功:', tab.url, '<=>', pattern);
+                if (!matchedTabIds.has(tab.id)) {
+                    // 检查是否匹配任一模式
+                    const isMatch = rule.patterns.some(pattern => {
+                        const result = matchPattern(tab.url, pattern);
+                        if (result) {
+                            console.log('✓ 匹配成功:', tab.url, '<=>', pattern);
+                        }
+                        return result;
+                    });
+                    
+                    if (isMatch) {
+                        matchedTabs.push(tab);
+                        matchedTabIds.add(tab.id);
                     }
-                    return result;
-                });
-                
-                if (isMatch) {
-                    matchedTabs.push(tab);
                 }
             }
             
             console.log('规则', rule.name, '匹配到', matchedTabs.length, '个标签');
             
-            // 如果有匹配的标签，创建分组
             if (matchedTabs.length > 0) {
-                const tabIds = matchedTabs.map(tab => tab.id);
-                
-                // 先解散这些标签的现有分组
-                await chrome.tabs.ungroup(tabIds);
-                
-                // 然后创建新的分组
-                const groupId = await chrome.tabs.group({ tabIds: tabIds });
-                
-                await chrome.tabGroups.update(groupId, {
-                    title: `${rule.name}_${matchedTabs.length}`,
-                    color: rule.color || 'grey',
-                    collapsed: true  // 默认折叠新创建的分组
-                });
-                
-                groupedCount += matchedTabs.length;
+                orderedGroups.push({ rule, tabs: matchedTabs });
             }
         }
         
-        // 更新所有分组的标签数量（包括被规则分组影响的旧分组）
-        const allGroups = await chrome.tabGroups.query({});
-        const allTabsForCount = await chrome.tabs.query({ windowId: currentWindow.id });
+        // 未匹配的标签
+        const unmatchedTabs = tabs.filter(t => !matchedTabIds.has(t.id));
         
-        // 统计每个分组的实际标签数
-        const groupTabCounts = {};
-        allTabsForCount.forEach(tab => {
-            if (tab.groupId && tab.groupId !== -1) {
-                groupTabCounts[tab.groupId] = (groupTabCounts[tab.groupId] || 0) + 1;
+        // 按规则顺序移动标签
+        let currentIndex = pinnedTabs.length;
+        
+        for (const { rule, tabs: ruleTabs } of orderedGroups) {
+            // 移动标签到当前位置
+            for (const tab of ruleTabs) {
+                await chrome.tabs.move(tab.id, { index: currentIndex });
+                currentIndex++;
             }
-        });
+        }
         
-        // 更新每个分组的标题并确保折叠
-        for (const group of allGroups) {
-            const actualCount = groupTabCounts[group.id] || 0;
-            let currentTitle = group.title || '未命名组';
+        // 移动未匹配的标签到最后
+        for (const tab of unmatchedTabs) {
+            await chrome.tabs.move(tab.id, { index: currentIndex });
+            currentIndex++;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        // 创建分组
+        let groupedCount = 0;
+        for (const { rule, tabs: ruleTabs } of orderedGroups) {
+            const tabIds = ruleTabs.map(tab => tab.id);
+            const groupId = await chrome.tabs.group({ tabIds: tabIds });
             
-            // 移除旧的数量后缀
-            currentTitle = currentTitle.replace(/_\d+$/, '');
-            
-            // 添加新的实际数量
-            const newTitle = `${currentTitle}_${actualCount}`;
-            
-            await chrome.tabGroups.update(group.id, { 
-                title: newTitle,
-                collapsed: true  // 确保所有分组都折叠
+            await chrome.tabGroups.update(groupId, {
+                title: `${rule.name}_${ruleTabs.length}`,
+                color: rule.color || 'grey',
+                collapsed: true
             });
+            
+            groupedCount += ruleTabs.length;
         }
         
         // 刷新显示
@@ -968,16 +1054,18 @@ document.getElementById('cloneActiveTabButton').addEventListener('click', async 
     }
 });
 
-// 保存排固 - 保存标签到HTML但排除固定标签
+// 保存排固 - 只保存当前窗口的标签，排除固定标签
 document.getElementById('saveExcludePinnedButton').addEventListener('click', async () => {
     const status = document.getElementById('status');
-    status.textContent = '正在保存标签页(排除固定标签)...';
+    status.textContent = '正在保存当前窗口标签(排除固定标签)...';
     
     try {
-        const allTabs = await getAllTabs();
+        // 获取当前窗口的所有标签
+        const currentWindow = await chrome.windows.getCurrent();
+        const currentWindowTabs = await chrome.tabs.query({ windowId: currentWindow.id });
         
         // 过滤掉固定标签和浏览器内部页面
-        const unpinnedTabs = allTabs.filter(tab => {
+        const unpinnedTabs = currentWindowTabs.filter(tab => {
             if (tab.pinned) return false;
             
             const url = tab.url.toLowerCase();
@@ -992,7 +1080,7 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
         });
         
         if (unpinnedTabs.length === 0) {
-            status.textContent = '没有非固定标签可以保存';
+            status.textContent = '当前窗口没有非固定标签可以保存';
             setTimeout(() => {
                 status.textContent = '';
             }, 3000);
@@ -1001,12 +1089,15 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
         
         const profile = await getProfileInfo();
         
-        // Get tab groups information
-        const tabGroups = await chrome.tabGroups.query({});
+        // Get tab groups information (只获取当前窗口的)
+        const tabGroups = await chrome.tabGroups.query({ windowId: currentWindow.id });
         
-        // Get grouping rules
+        // Get grouping rules - 强制从storage读取最新数据
+        console.log('正在读取分组规则...');
         const result = await chrome.storage.sync.get(['tabGroupingRules']);
         const groupingRules = result.tabGroupingRules || [];
+        console.log('读取到的规则数量:', groupingRules.length);
+        console.log('规则详情:', groupingRules);
         
         const html = generateHTML(unpinnedTabs, profile, tabGroups, groupingRules);
         
@@ -1014,7 +1105,7 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
         const blob = new Blob([html], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         
-        // 生成友好文件名：保存了X个标签_年月日_时分秒.html
+        // 生成友好文件名：保存了X个标签_当前窗口_年月日_时分秒.html
         const tabCount = unpinnedTabs.length;
         const date = new Date();
         const year = date.getFullYear();
@@ -1025,7 +1116,7 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
         const seconds = String(date.getSeconds()).padStart(2, '0');
         
         const timestamp = `${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
-        const filename = `保存了${tabCount}个标签_排除固定_${timestamp}.html`;
+        const filename = `保存了${tabCount}个标签_当前窗口_排除固定_${timestamp}.html`;
         
         // 控制保存对话框行为
         const useDefaultPath = true; // 设为true将使用浏览器默认路径，不显示对话框
@@ -1035,7 +1126,7 @@ document.getElementById('saveExcludePinnedButton').addEventListener('click', asy
             saveAs: !useDefaultPath // saveAs 为false时，不显示保存对话框
         });
         
-        status.textContent = `成功保存了 ${tabCount} 个标签(已排除固定标签和浏览器内部页面)`;
+        status.textContent = `成功保存了当前窗口的 ${tabCount} 个标签(已排除固定标签和浏览器内部页面)`;
         
         // 5秒后重置状态文本
         setTimeout(() => {

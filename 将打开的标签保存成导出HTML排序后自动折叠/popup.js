@@ -862,6 +862,17 @@ async function getProfileInfo() {
     <div class="no-results" id="noResultsMessage">没有找到匹配的标签页</div>
     
     <script>
+      // === 嵌入的分组规则数据 ===
+      const EMBEDDED_GROUPING_RULES = ${JSON.stringify(groupingRules)};
+      
+      // === 嵌入的标签数据 ===
+      const ALL_TABS_DATA = ${JSON.stringify(tabs.map(tab => ({
+        url: tab.url,
+        title: tab.title,
+        favIconUrl: tab.favIconUrl,
+        pinned: tab.pinned
+      })))};
+      
       const STORAGE_KEY = 'tabSaverVisitedLinks';
       const MARKERS_STORAGE_KEY = 'tabSaverMarkers';
       let popupNoticeShown = false;
@@ -1257,6 +1268,190 @@ async function getProfileInfo() {
         header.nextElementSibling.classList.toggle('collapsed');
       };
 
+      // === 重新生成按规则分组的功能 ===
+      function regenerateRuleBasedGroups() {
+        try {
+          const byRulesContainer = document.getElementById('byRules');
+          if (!byRulesContainer) {
+            console.error('找不到byRules容器');
+            return;
+          }
+          if (!EMBEDDED_GROUPING_RULES) {
+            console.error('没有嵌入的规则数据');
+            return;
+          }
+          if (!ALL_TABS_DATA) {
+            console.error('没有嵌入的标签数据');
+            return;
+          }
+          
+          console.log('开始重新生成按规则分组，规则数量:', EMBEDDED_GROUPING_RULES.length);
+          
+          const html = generateRuleBasedGroupsHTML(ALL_TABS_DATA, EMBEDDED_GROUPING_RULES);
+          console.log('生成的HTML长度:', html.length);
+          
+          byRulesContainer.innerHTML = html;
+          
+          console.log('按规则分组重新生成完成');
+          
+          // 重新应用访问历史和标记
+          applyVisitHistory();
+          applyMarkers();
+        } catch (error) {
+          console.error('重新生成按规则分组时出错:', error);
+          console.error('错误堆栈:', error.stack);
+        }
+      }
+      
+      function generateRuleBasedGroupsHTML(tabs, rules) {
+        try {
+          console.log('generateRuleBasedGroupsHTML 开始执行');
+          console.log('标签数量:', tabs.length);
+          console.log('规则数量:', rules.length);
+          
+          if (!rules || rules.length === 0) {
+            return '<div class="empty-state" style="text-align: center; padding: 40px; color: #666;"><p>没有配置分组规则</p></div>';
+          }
+          
+          function matchPattern(url, pattern) {
+            try {
+              let regexPattern = pattern;
+              regexPattern = regexPattern.replace(/\\\\/g, '\\\\\\\\');
+              regexPattern = regexPattern.replace(/\\./g, '\\\\.');
+              regexPattern = regexPattern.replace(/\\+/g, '\\\\+');
+              regexPattern = regexPattern.replace(/\\?/g, '\\\\?');
+              regexPattern = regexPattern.replace(/\\^/g, '\\\\^');
+              regexPattern = regexPattern.replace(/\\$/g, '\\\\$');
+              regexPattern = regexPattern.replace(/\\{/g, '\\\\{');
+              regexPattern = regexPattern.replace(/\\}/g, '\\\\}');
+              regexPattern = regexPattern.replace(/\\(/g, '\\\\(');
+              regexPattern = regexPattern.replace(/\\)/g, '\\\\)');
+              regexPattern = regexPattern.replace(/\\|/g, '\\\\|');
+              regexPattern = regexPattern.replace(/\\[/g, '\\\\[');
+              regexPattern = regexPattern.replace(/\\]/g, '\\\\]');
+              regexPattern = regexPattern.replace(/\\*/g, '.*');
+              
+              const regex = new RegExp('^' + regexPattern + '$', 'i');
+              return regex.test(url);
+            } catch (e) {
+              console.error('matchPattern错误:', e, 'pattern:', pattern);
+              return false;
+            }
+          }
+        
+        function getGroupColor(colorName) {
+          const colorMap = {'grey':'#5F6368','blue':'#1A73E8','red':'#D93025','yellow':'#F9AB00','green':'#1E8E3E','pink':'#D01884','purple':'#9334E6','cyan':'#12B5CB','orange':'#FA903E'};
+          return colorMap[colorName] || colorMap['grey'];
+        }
+        
+        const matchedTabs = new Set();
+        const ruleGroups = [];
+        
+        rules.forEach(rule => {
+          const ruleTabs = tabs.filter(tab => {
+            if (matchedTabs.has(tab.url)) return false;
+            const isMatch = rule.patterns.some(pattern => matchPattern(tab.url, pattern));
+            if (isMatch) matchedTabs.add(tab.url);
+            return isMatch;
+          });
+          
+          if (ruleTabs.length > 0) {
+            ruleGroups.push({name: rule.name, color: rule.color, tabs: ruleTabs});
+          }
+        });
+        
+        const unmatchedTabs = tabs.filter(tab => !matchedTabs.has(tab.url));
+        
+        let html = ruleGroups.map(group => \`
+          <div class="tab-group">
+            <div class="group-header" onclick="window.toggleGroup(this)">
+              <span class="group-header-title">
+                <input type="checkbox" class="group-select-checkbox" onclick="window.toggleGroupSelection(this)">
+                <span class="group-color-indicator" style="background-color: \${getGroupColor(group.color)}"></span>
+                \${group.name} 【共有\${group.tabs.length}个标签】
+              </span>
+              <span class="toggle-icon">▾</span>
+            </div>
+            <div class="group-content">
+              \${group.tabs.map((tab, i) => \`
+                <div class="tab-entry" data-url="\${tab.url}" data-title="\${tab.title||''}">
+                  <span class="tab-index">\${i+1}</span>
+                  <input type="checkbox" class="tab-checkbox" onclick="window.updateSelectionState()">
+                  <img class="tab-icon" src="\${tab.favIconUrl||''}" onerror="this.style.backgroundColor='#e0e0e0'">
+                  <div class="tab-content">
+                    <a href="\${tab.url}" class="tab-title" target="_blank" onmousedown="window.handleLinkClick(event)">\${tab.title||tab.url}</a>
+                    <div class="tab-url-container">
+                      <span class="tab-url-toggle" onclick="window.toggleUrl(this)">▶ 显示URL</span>
+                      <div class="tab-url collapsed">\${tab.url}</div>
+                    </div>
+                    <div class="visit-info"><span class="visit-time"></span><span class="visit-count"></span></div>
+                    <div class="tab-markers">
+                      <label class="marker-checkbox marker-downloaded">
+                        <input type="checkbox" class="marker-downloaded-cb" onchange="window.saveMarker(this,'downloaded')">
+                        <span>✓ 已下载</span>
+                      </label>
+                      <label class="marker-checkbox marker-skipped">
+                        <input type="checkbox" class="marker-skipped-cb" onchange="window.saveMarker(this,'skipped')">
+                        <span>✗ 未下载</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              \`).join('')}
+            </div>
+          </div>
+        \`).join('');
+        
+        if (unmatchedTabs.length > 0) {
+          html += \`
+            <div class="tab-group">
+              <div class="group-header" onclick="window.toggleGroup(this)">
+                <span class="group-header-title">
+                  <input type="checkbox" class="group-select-checkbox" onclick="window.toggleGroupSelection(this)">
+                  未匹配标签 【共有\${unmatchedTabs.length}个标签】
+                </span>
+                <span class="toggle-icon">▾</span>
+              </div>
+              <div class="group-content">
+                \${unmatchedTabs.map((tab, i) => \`
+                  <div class="tab-entry" data-url="\${tab.url}" data-title="\${tab.title||''}">
+                    <span class="tab-index">\${i+1}</span>
+                    <input type="checkbox" class="tab-checkbox" onclick="window.updateSelectionState()">
+                    <img class="tab-icon" src="\${tab.favIconUrl||''}" onerror="this.style.backgroundColor='#e0e0e0'">
+                    <div class="tab-content">
+                      <a href="\${tab.url}" class="tab-title" target="_blank" onmousedown="window.handleLinkClick(event)">\${tab.title||tab.url}</a>
+                      <div class="tab-url-container">
+                        <span class="tab-url-toggle" onclick="window.toggleUrl(this)">▶ 显示URL</span>
+                        <div class="tab-url collapsed">\${tab.url}</div>
+                      </div>
+                      <div class="visit-info"><span class="visit-time"></span><span class="visit-count"></span></div>
+                      <div class="tab-markers">
+                        <label class="marker-checkbox marker-downloaded">
+                          <input type="checkbox" class="marker-downloaded-cb" onchange="window.saveMarker(this,'downloaded')">
+                          <span>✓ 已下载</span>
+                        </label>
+                        <label class="marker-checkbox marker-skipped">
+                          <input type="checkbox" class="marker-skipped-cb" onchange="window.saveMarker(this,'skipped')">
+                          <span>✗ 未下载</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                \`).join('')}
+              </div>
+            </div>
+          \`;
+        }
+        
+        console.log('生成的HTML长度:', html.length);
+        return html;
+        } catch (error) {
+          console.error('generateRuleBasedGroupsHTML执行出错:', error);
+          console.error('错误堆栈:', error.stack);
+          return '<div class="empty-state" style="text-align: center; padding: 40px; color: #f44336;"><p>生成规则分组时出错: ' + error.message + '</p></div>';
+        }
+      }
+
       // --- View Switching Logic ---
       document.querySelectorAll('.view-button').forEach(button => {
         button.addEventListener('click', () => {
@@ -1274,9 +1469,16 @@ async function getProfileInfo() {
       
       // Initial state on load
       document.addEventListener('DOMContentLoaded', () => {
+        console.log('=== 页面加载完成 ===');
+        console.log('嵌入的规则数量:', EMBEDDED_GROUPING_RULES ? EMBEDDED_GROUPING_RULES.length : '未定义');
+        console.log('嵌入的标签数量:', ALL_TABS_DATA ? ALL_TABS_DATA.length : '未定义');
+        
         applyVisitHistory(); 
         applyMarkers();
         window.updateSelectionState();
+        
+        // 重新生成按规则分组视图（使用嵌入的规则数据）
+        regenerateRuleBasedGroups();
       });
     </script>
   </body>
@@ -1355,3 +1557,4 @@ async function getProfileInfo() {
       status.textContent = '保存标签页出错: ' + error.message;
     }
   });
+
