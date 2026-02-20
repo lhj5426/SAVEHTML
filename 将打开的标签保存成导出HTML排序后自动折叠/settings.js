@@ -2,18 +2,22 @@
 
 const STORAGE_KEY = 'tabGroupingRules';
 let selectedColor = 'blue';
+let editingIndex = -1; // -1表示添加模式,>=0表示编辑模式
 
-// 颜色映射
+// Chrome API 支持的颜色名称（这9个是固定的，不能用其他值）
+const VALID_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
+
+// 颜色映射 - 从标签自动分组扩展中提取的颜色值
 const colorMap = {
-    'grey': '#5F6368',
-    'blue': '#1A73E8',
-    'red': '#D93025',
-    'yellow': '#F9AB00',
-    'green': '#1E8E3E',
-    'pink': '#D01884',
-    'purple': '#9334E6',
-    'cyan': '#12B5CB',
-    'orange': '#FA903E'
+    'grey': '#5f6369',
+    'blue': '#1974e8',
+    'red': '#da3025',
+    'yellow': '#f9ab04',
+    'green': '#198139',
+    'pink': '#d01984',
+    'purple': '#a143f5',
+    'cyan': '#027b84',
+    'orange': '#fa913e'
 };
 
 // 初始化颜色选择器
@@ -25,12 +29,14 @@ function initColorPicker() {
             colorOptions.forEach(opt => opt.classList.remove('selected'));
             option.classList.add('selected');
             selectedColor = option.dataset.color;
+            console.log('Selected color:', selectedColor);
         });
     });
     
-    // 默认选中第一个
-    if (colorOptions.length > 0) {
-        colorOptions[0].classList.add('selected');
+    // 默认选中blue
+    const defaultOption = document.querySelector('.color-option[data-color="blue"]');
+    if (defaultOption) {
+        defaultOption.classList.add('selected');
     }
 }
 
@@ -42,7 +48,26 @@ function loadRules() {
             console.error('Error loading rules:', chrome.runtime.lastError);
             return;
         }
-        const rules = result[STORAGE_KEY] || [];
+        let rules = result[STORAGE_KEY] || [];
+        
+        // 清理无效的颜色值
+        let needsUpdate = false;
+        rules = rules.map(rule => {
+            if (!VALID_COLORS.includes(rule.color)) {
+                console.warn('Invalid color found:', rule.color, 'replacing with grey');
+                needsUpdate = true;
+                return { ...rule, color: 'grey' };
+            }
+            return rule;
+        });
+        
+        // 如果有无效颜色，保存清理后的数据
+        if (needsUpdate) {
+            chrome.storage.sync.set({ [STORAGE_KEY]: rules }, () => {
+                console.log('Cleaned up invalid colors');
+            });
+        }
+        
         console.log('Loaded rules:', rules);
         displayRules(rules);
     });
@@ -161,7 +186,7 @@ function displayRules(rules) {
 
 // 添加规则
 function addRule() {
-    console.log('addRule function called');
+    console.log('addRule function called, editingIndex:', editingIndex);
     
     const nameInput = document.getElementById('ruleName');
     const patternsInput = document.getElementById('rulePatterns');
@@ -203,8 +228,14 @@ function addRule() {
     const newRule = {
         name: name,
         patterns: patterns,
-        color: selectedColor
+        color: selectedColor  // 确保使用的是颜色名称字符串，不是十六进制值
     };
+    
+    // 验证颜色值
+    if (!VALID_COLORS.includes(selectedColor)) {
+        console.warn('Invalid color:', selectedColor, 'defaulting to grey');
+        newRule.color = 'grey';
+    }
     
     console.log('Creating new rule:', newRule);
     
@@ -218,7 +249,16 @@ function addRule() {
         const rules = result[STORAGE_KEY] || [];
         console.log('Current rules:', rules);
         
-        rules.push(newRule);
+        if (editingIndex >= 0) {
+            // 编辑模式:替换原位置的规则
+            rules[editingIndex] = newRule;
+            console.log('Updated rule at index:', editingIndex);
+        } else {
+            // 添加模式:添加到最后
+            rules.push(newRule);
+            console.log('Added new rule');
+        }
+        
         console.log('Updated rules:', rules);
         
         chrome.storage.sync.set({ [STORAGE_KEY]: rules }, () => {
@@ -229,7 +269,7 @@ function addRule() {
             }
             
             console.log('Rule saved successfully');
-            showStatus('规则添加成功！', 'success');
+            showStatus(editingIndex >= 0 ? '规则修改成功！' : '规则添加成功！', 'success');
             loadRules();
             clearForm();
         });
@@ -366,6 +406,10 @@ function editRule(index) {
         
         console.log('Editing rule:', rule);
         
+        // 设置编辑模式
+        editingIndex = index;
+        
+        // 填充表单
         document.getElementById('ruleName').value = rule.name;
         document.getElementById('rulePatterns').value = rule.patterns.join('\n');
         
@@ -378,15 +422,22 @@ function editRule(index) {
             }
         });
         
-        // 删除旧规则
-        rules.splice(index, 1);
-        chrome.storage.sync.set({ [STORAGE_KEY]: rules }, () => {
-            if (chrome.runtime.lastError) {
-                console.error('Error saving storage:', chrome.runtime.lastError);
-                return;
+        // 确保选中的颜色是有效的
+        if (!VALID_COLORS.includes(selectedColor)) {
+            console.warn('Invalid color in rule:', selectedColor, 'defaulting to blue');
+            selectedColor = 'blue';
+            const defaultOption = document.querySelector('.color-option[data-color="blue"]');
+            if (defaultOption) {
+                defaultOption.classList.add('selected');
             }
-            loadRules();
-        });
+        }
+        
+        // 修改按钮文字
+        const addButton = document.getElementById('addRuleButton');
+        if (addButton) {
+            addButton.innerHTML = '✓ 确认修改';
+            addButton.style.background = '#FF9800';
+        }
         
         // 滚动到表单
         document.querySelector('.add-rule-form').scrollIntoView({ behavior: 'smooth' });
@@ -398,10 +449,25 @@ function clearForm() {
     console.log('Clearing form');
     document.getElementById('ruleName').value = '';
     document.getElementById('rulePatterns').value = '';
-    document.querySelectorAll('.color-option').forEach((opt, idx) => {
-        opt.classList.remove('selected');
-        if (idx === 0) opt.classList.add('selected');
+    
+    // 重置为添加模式
+    editingIndex = -1;
+    
+    // 恢复按钮文字
+    const addButton = document.getElementById('addRuleButton');
+    if (addButton) {
+        addButton.innerHTML = '✓ 添加规则';
+        addButton.style.background = '#4CAF50';
+    }
+    
+    // 重置颜色选择
+    document.querySelectorAll('.color-option').forEach(option => {
+        option.classList.remove('selected');
     });
+    const defaultOption = document.querySelector('.color-option[data-color="blue"]');
+    if (defaultOption) {
+        defaultOption.classList.add('selected');
+    }
     selectedColor = 'blue';
 }
 

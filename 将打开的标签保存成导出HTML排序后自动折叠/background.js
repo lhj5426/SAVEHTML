@@ -423,9 +423,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           const tabIds = ruleTabs.map(tab => tab.id);
           const groupId = await chrome.tabs.group({ tabIds: tabIds });
           
+          // 确保颜色值是有效的
+          const validColors = ['blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange', 'grey'];
+          let groupColor = rule.color || 'grey';
+          if (!validColors.includes(groupColor)) {
+            console.warn('Invalid color in rule:', groupColor, 'defaulting to grey');
+            groupColor = 'grey';
+          }
+          
           await chrome.tabGroups.update(groupId, {
             title: `${rule.name}_${ruleTabs.length}`,
-            color: rule.color || 'grey',
+            color: groupColor,
             collapsed: true
           });
         }
