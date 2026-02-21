@@ -451,17 +451,57 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
             }
         }
         
-        // 解散所有分组
-        const groupedTabs = tabs.filter(t => t.groupId !== -1);
-        if (groupedTabs.length > 0) {
-            const tabIds = groupedTabs.map(t => t.id);
-            await chrome.tabs.ungroup(tabIds);
+        // 获取所有现有的分组信息
+        const existingGroups = await chrome.tabGroups.query({ windowId: currentWindow.id });
+        console.log('现有分组:', existingGroups);
+        
+        // 创建规则名称集合
+        const ruleNames = new Set(rules.map(r => r.name));
+        console.log('规则名称集合:', ruleNames);
+        
+        // 只解散规则分组,保留手动创建的分组
+        const groupsToUngroup = existingGroups.filter(group => {
+            // 检查分组名是否匹配规则名(可能带有_数字后缀)
+            const groupTitle = group.title || '';
+            const baseName = groupTitle.replace(/_\d+$/, ''); // 移除 _数字 后缀
+            const isRuleGroup = ruleNames.has(baseName);
+            console.log(`分组 "${groupTitle}" -> 基础名 "${baseName}" -> 是规则分组: ${isRuleGroup}`);
+            return isRuleGroup;
+        });
+        
+        console.log('需要解散的分组:', groupsToUngroup);
+        
+        // 解散规则分组
+        for (const group of groupsToUngroup) {
+            const tabsInGroup = tabs.filter(t => t.groupId === group.id);
+            if (tabsInGroup.length > 0) {
+                const tabIds = tabsInGroup.map(t => t.id);
+                await chrome.tabs.ungroup(tabIds);
+            }
+        }
+        
+        if (groupsToUngroup.length > 0) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
         // 收集所有规则匹配的标签
         const matchedTabIds = new Set();
         const orderedGroups = [];
+        
+        // 获取所有手动分组的标签ID(不在规则分组中的标签)
+        const manualGroupTabIds = new Set();
+        for (const group of existingGroups) {
+            const groupTitle = group.title || '';
+            const baseName = groupTitle.replace(/_\d+$/, '');
+            if (!ruleNames.has(baseName)) {
+                // 这是手动分组,收集其中的标签ID
+                const tabsInGroup = tabs.filter(t => t.groupId === group.id);
+                tabsInGroup.forEach(t => manualGroupTabIds.add(t.id));
+                console.log(`手动分组 "${groupTitle}" 包含 ${tabsInGroup.length} 个标签`);
+            }
+        }
+        
+        console.log('手动分组的标签数量:', manualGroupTabIds.size);
         
         for (const rule of rules) {
             console.log('=== 处理规则:', rule.name, '===');
@@ -470,6 +510,12 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
             
             // 找到匹配该规则的所有标签
             for (const tab of tabs) {
+                // 跳过已经在手动分组中的标签
+                if (manualGroupTabIds.has(tab.id)) {
+                    console.log('跳过手动分组的标签:', tab.title);
+                    continue;
+                }
+                
                 if (!matchedTabIds.has(tab.id)) {
                     // 检查是否匹配任一模式
                     const isMatch = rule.patterns.some(pattern => {
@@ -494,8 +540,8 @@ document.getElementById('groupByRulesButton').addEventListener('click', async ()
             }
         }
         
-        // 未匹配的标签
-        const unmatchedTabs = tabs.filter(t => !matchedTabIds.has(t.id));
+        // 未匹配的标签(排除手动分组的标签)
+        const unmatchedTabs = tabs.filter(t => !matchedTabIds.has(t.id) && !manualGroupTabIds.has(t.id));
         
         // 按规则顺序移动标签
         let currentIndex = pinnedTabs.length;
@@ -577,25 +623,44 @@ document.getElementById('ungroupButton').addEventListener('click', async () => {
         const currentWindow = await chrome.windows.getCurrent();
         const tabs = await chrome.tabs.query({ windowId: currentWindow.id });
         
-        // 找出所有在组中的标签
-        const groupedTabs = tabs.filter(tab => tab.groupId !== -1);
+        // 获取规则
+        const result = await chrome.storage.sync.get(['tabGroupingRules']);
+        const rules = result.tabGroupingRules || [];
+        const ruleNames = new Set(rules.map(r => r.name));
         
-        if (groupedTabs.length === 0) {
-            alert('当前窗口没有分组的标签');
+        // 获取所有分组
+        const existingGroups = await chrome.tabGroups.query({ windowId: currentWindow.id });
+        
+        // 只解散规则分组
+        const groupsToUngroup = existingGroups.filter(group => {
+            const groupTitle = group.title || '';
+            const baseName = groupTitle.replace(/_\d+$/, '');
+            return ruleNames.has(baseName);
+        });
+        
+        if (groupsToUngroup.length === 0) {
+            alert('当前窗口没有规则分组');
             button.innerHTML = originalHTML;
             button.disabled = false;
             return;
         }
         
-        // 解散所有分组
-        const tabIds = groupedTabs.map(tab => tab.id);
-        await chrome.tabs.ungroup(tabIds);
+        // 解散规则分组
+        let ungroupedCount = 0;
+        for (const group of groupsToUngroup) {
+            const tabsInGroup = tabs.filter(t => t.groupId === group.id);
+            if (tabsInGroup.length > 0) {
+                const tabIds = tabsInGroup.map(t => t.id);
+                await chrome.tabs.ungroup(tabIds);
+                ungroupedCount += tabsInGroup.length;
+            }
+        }
         
         // 刷新显示
         await updateStats();
         
         // 显示成功消息
-        button.innerHTML = `✓ 已解散 ${groupedTabs.length} 个标签`;
+        button.innerHTML = `✓ 已解散 ${ungroupedCount} 个标签`;
         setTimeout(() => {
             button.innerHTML = originalHTML;
             button.disabled = false;

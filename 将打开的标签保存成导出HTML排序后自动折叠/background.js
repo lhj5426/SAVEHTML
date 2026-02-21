@@ -368,11 +368,41 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           }
         }
         
-        // 解散所有分组
-        const groupedTabIds = unpinnedTabsForRules.filter(t => t.groupId !== -1).map(t => t.id);
-        if (groupedTabIds.length > 0) {
-          await chrome.tabs.ungroup(groupedTabIds);
+        // 获取所有现有的分组信息
+        const existingGroupsForRules = await chrome.tabGroups.query({ windowId: windowId });
+        
+        // 创建规则名称集合
+        const ruleNamesForRules = new Set(rules.map(r => r.name));
+        
+        // 只解散规则分组,保留手动创建的分组
+        const groupsToUngroupForRules = existingGroupsForRules.filter(group => {
+          const groupTitle = group.title || '';
+          const baseName = groupTitle.replace(/_\d+$/, '');
+          return ruleNamesForRules.has(baseName);
+        });
+        
+        // 解散规则分组
+        for (const group of groupsToUngroupForRules) {
+          const tabsInGroup = unpinnedTabsForRules.filter(t => t.groupId === group.id);
+          if (tabsInGroup.length > 0) {
+            const tabIds = tabsInGroup.map(t => t.id);
+            await chrome.tabs.ungroup(tabIds);
+          }
+        }
+        
+        if (groupsToUngroupForRules.length > 0) {
           await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        // 收集所有手动分组的标签ID
+        const manualGroupTabIdsForRules = new Set();
+        for (const group of existingGroupsForRules) {
+          const groupTitle = group.title || '';
+          const baseName = groupTitle.replace(/_\d+$/, '');
+          if (!ruleNamesForRules.has(baseName)) {
+            const tabsInGroup = unpinnedTabsForRules.filter(t => t.groupId === group.id);
+            tabsInGroup.forEach(t => manualGroupTabIdsForRules.add(t.id));
+          }
         }
         
         // 收集所有规则匹配的标签
@@ -383,6 +413,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           const matchedTabs = [];
           
           for (const tab of unpinnedTabsForRules) {
+            // 跳过已经在手动分组中的标签
+            if (manualGroupTabIdsForRules.has(tab.id)) {
+              continue;
+            }
+            
             if (!matchedTabIds.has(tab.id)) {
               const isMatch = rule.patterns.some(pattern => matchPattern(tab.url, pattern));
               if (isMatch) {
@@ -397,8 +432,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           }
         }
         
-        // 未匹配的标签
-        const unmatchedTabs = unpinnedTabsForRules.filter(t => !matchedTabIds.has(t.id));
+        // 未匹配的标签(排除手动分组的标签)
+        const unmatchedTabs = unpinnedTabsForRules.filter(t => !matchedTabIds.has(t.id) && !manualGroupTabIdsForRules.has(t.id));
         
         // 按规则顺序移动标签
         let currentIndex = pinnedTabsForRules.length;
@@ -440,11 +475,29 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         break;
 
       case 'ungroupAll':
-        // 解散所有分组
-        const groupedTabs = allTabs.filter(t => t.groupId !== -1);
-        if (groupedTabs.length > 0) {
-          const tabIds = groupedTabs.map(t => t.id);
-          await chrome.tabs.ungroup(tabIds);
+        // 解散所有分组(排除手动创建的分组)
+        // 获取规则
+        const resultForUngroup = await chrome.storage.sync.get(['tabGroupingRules']);
+        const rulesForUngroup = resultForUngroup.tabGroupingRules || [];
+        const ruleNamesForUngroup = new Set(rulesForUngroup.map(r => r.name));
+        
+        // 获取所有分组
+        const existingGroupsForUngroup = await chrome.tabGroups.query({ windowId: windowId });
+        
+        // 只解散规则分组
+        const groupsToUngroup = existingGroupsForUngroup.filter(group => {
+          const groupTitle = group.title || '';
+          const baseName = groupTitle.replace(/_\d+$/, '');
+          return ruleNamesForUngroup.has(baseName);
+        });
+        
+        // 解散规则分组
+        for (const group of groupsToUngroup) {
+          const tabsInGroup = allTabs.filter(t => t.groupId === group.id);
+          if (tabsInGroup.length > 0) {
+            const tabIds = tabsInGroup.map(t => t.id);
+            await chrome.tabs.ungroup(tabIds);
+          }
         }
         break;
 
