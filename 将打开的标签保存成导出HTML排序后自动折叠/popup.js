@@ -445,9 +445,8 @@ async function getProfileInfo() {
     <style>
       body {
         font-family: Arial, sans-serif;
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
+        margin: 0;
+        padding: 20px 20px 20px 210px;
         background-color: #f5f5f5;
       }
       .static-header {
@@ -519,18 +518,29 @@ async function getProfileInfo() {
         box-sizing: border-box;
       }
       .view-controls {
-        margin: 0 0 20px 0;
+        position: fixed;
+        left: 20px;
+        top: 20px;
+        width: 150px;
+        z-index: 999;
+        background-color: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(8px);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
         display: flex;
+        flex-direction: column;
         gap: 10px;
-        align-items: center;
-        flex-wrap: wrap;
       }
       .view-button {
-        padding: 8px 16px;
+        padding: 10px 12px;
         border: 1px solid #ddd;
         border-radius: 4px;
         background: white;
         cursor: pointer;
+        text-align: center;
+        font-size: 13px;
+        white-space: nowrap;
       }
       .view-button.active {
         background: #2196F3;
@@ -818,6 +828,7 @@ async function getProfileInfo() {
       <button class="view-button" data-view="url">按网址</button>
       <button class="view-button" data-view="byTabGroup">按标签组</button>
       <button class="view-button" data-view="byRules">按规则分组</button>
+      <button class="view-button" data-view="byRulesUnvisited">按未访问排序</button>
       <button class="view-button" data-view="grouped">按域名分组</button>
     </div>
     
@@ -841,6 +852,10 @@ async function getProfileInfo() {
       
       <div class="tabs-container" id="byRules">
         ${ruleGroupsHTML}
+      </div>
+      
+      <div class="tabs-container" id="byRulesUnvisited">
+        <!-- 未访问标签将在页面加载后动态生成 -->
       </div>
       
       <div class="tabs-container" id="grouped">
@@ -1046,6 +1061,11 @@ async function getProfileInfo() {
                       }
                   }
               });
+              
+              // 重新生成未访问标签视图
+              if (typeof regenerateRuleBasedGroupsUnvisited === 'function') {
+                  regenerateRuleBasedGroupsUnvisited();
+              }
           } catch (e) {
               console.error('清除访问历史时出错:', e);
           }
@@ -1332,6 +1352,52 @@ async function getProfileInfo() {
         }
       }
       
+      // === 生成未访问标签的按规则分组视图 ===
+      function regenerateRuleBasedGroupsUnvisited() {
+        try {
+          const byRulesUnvisitedContainer = document.getElementById('byRulesUnvisited');
+          if (!byRulesUnvisitedContainer) {
+            console.error('找不到byRulesUnvisited容器');
+            return;
+          }
+          if (!EMBEDDED_GROUPING_RULES) {
+            console.error('没有嵌入的规则数据');
+            return;
+          }
+          if (!ALL_TABS_DATA) {
+            console.error('没有嵌入的标签数据');
+            return;
+          }
+          
+          console.log('开始生成未访问标签的按规则分组视图');
+          
+          // 获取访问记录
+          const visitedLinks = getVisitedLinks();
+          
+          // 过滤出未访问的标签
+          const unvisitedTabs = ALL_TABS_DATA.filter(tab => !visitedLinks[tab.url]);
+          
+          console.log('未访问标签数量:', unvisitedTabs.length);
+          
+          if (unvisitedTabs.length === 0) {
+            byRulesUnvisitedContainer.innerHTML = '<div class="empty-state" style="text-align: center; padding: 40px; color: #666;"><p>没有未访问的标签</p></div>';
+            return;
+          }
+          
+          const html = generateRuleBasedGroupsHTML(unvisitedTabs, EMBEDDED_GROUPING_RULES);
+          byRulesUnvisitedContainer.innerHTML = html;
+          
+          console.log('未访问标签的按规则分组视图生成完成');
+          
+          // 重新应用访问历史和标记
+          applyVisitHistory();
+          applyMarkers();
+        } catch (error) {
+          console.error('生成未访问标签视图时出错:', error);
+          console.error('错误堆栈:', error.stack);
+        }
+      }
+      
       function generateRuleBasedGroupsHTML(tabs, rules) {
         try {
           console.log('generateRuleBasedGroupsHTML 开始执行');
@@ -1491,6 +1557,13 @@ async function getProfileInfo() {
           document.querySelectorAll('.views > div').forEach(view => view.classList.remove('active'));
           document.getElementById(button.dataset.view).classList.add('active');
           
+          // 如果切换到未访问视图,重新生成
+          if (button.dataset.view === 'byRulesUnvisited') {
+            if (typeof regenerateRuleBasedGroupsUnvisited === 'function') {
+              regenerateRuleBasedGroupsUnvisited();
+            }
+          }
+          
           document.querySelector('.search-input').value = '';
           window.searchTabs(''); 
         });
@@ -1508,6 +1581,9 @@ async function getProfileInfo() {
         
         // 重新生成按规则分组视图（使用嵌入的规则数据）
         regenerateRuleBasedGroups();
+        
+        // 生成未访问标签的按规则分组视图
+        regenerateRuleBasedGroupsUnvisited();
       });
     </script>
   </body>
