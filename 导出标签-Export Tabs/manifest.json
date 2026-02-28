@@ -1,0 +1,22 @@
+﻿{
+    "name": "导出标签",
+    "version": "1.2",
+    "description": "Export the URL of all opened tabs to text and advanced HTML",
+    "icons": {
+        "16": "tabs_io.png",
+        "48": "tabs_io_48.png",
+        "128": "tabs_io_128.png"
+    },
+    "action": {
+        "default_icon": "tabs_io.png",
+        "default_title": "导出标签",
+        "default_popup": "popup.html"
+    },
+    "permissions": [
+        "tabs",
+        "tabGroups",
+        "storage",
+        "downloads"
+    ],
+    "manifest_version": 3
+}
